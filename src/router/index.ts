@@ -35,9 +35,9 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const isAuthenticated = !!localStorage.getItem('access_token');
-  
+
   if (to.meta.requiresAuth && !isAuthenticated) {
     next({ name: 'Login' });
   } else if (to.name === 'Login' && isAuthenticated) {
