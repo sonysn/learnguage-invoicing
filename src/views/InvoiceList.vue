@@ -32,11 +32,11 @@ const fetchInvoices = async () => {
   }
 };
 
-const confirmPayment = async (id: number) => {
-  if (!confirm('Are you sure you want to confirm payment? This will send the PDF invoice to the student.')) return;
-  
+const markAsSent = async (id: number) => {
+  if (!confirm('Are you sure you want to mark this invoice as sent? This will send the PDF invoice to the student.')) return;
+
   try {
-    await api.post(`/invoices/${id}/confirm_payment/`);
+    await api.post(`/invoices/${id}/mark_as_sent/`);
     await fetchInvoices();
   } catch (err: any) {
     alert('Error: ' + (err.response?.data?.detail || err.message));
@@ -54,7 +54,7 @@ const resendInvoice = async (id: number) => {
 
 const deleteInvoice = async (id: number, number: string) => {
   if (!confirm(`Are you sure you want to delete invoice ${number}? This action cannot be undone.`)) return;
-  
+
   try {
     await api.delete(`/invoices/${id}/`);
     await fetchInvoices();
@@ -68,7 +68,6 @@ const downloadPdf = async (id: number, number: string) => {
     const response = await api.get(`/invoices/${id}/download_pdf/`, {
       responseType: 'blob'
     });
-    // With responseType: 'blob', response.data is already the Blob object
     const url = window.URL.createObjectURL(response.data);
     const link = document.createElement('a');
     link.href = url;
@@ -94,7 +93,7 @@ const formatDate = (dateString: string) => {
 
 const getStatusClass = (status: string) => {
   switch (status) {
-    case 'paid': return 'status-paid';
+    case 'sent': return 'status-sent';
     case 'pending': return 'status-pending';
     case 'cancelled': return 'status-cancelled';
     default: return 'status-draft';
@@ -113,7 +112,7 @@ const getDescriptionSummary = (invoice: Invoice) => {
     <div class="page-header">
       <div>
         <h1>Invoices</h1>
-        <p class="subtitle">Manage and track your student payments</p>
+        <p class="subtitle">Manage and track your student invoices</p>
       </div>
       <div class="header-actions">
         <button @click="fetchInvoices" class="btn-secondary" :disabled="loading">
@@ -127,13 +126,13 @@ const getDescriptionSummary = (invoice: Invoice) => {
       <div class="spinner"></div>
       <p>Fetching invoices...</p>
     </div>
-    
+
     <div v-else-if="error" class="error-container">
       <div class="error-icon">!</div>
       <p>{{ error }}</p>
       <button @click="fetchInvoices" class="btn-secondary">Try Again</button>
     </div>
-    
+
     <div v-else class="card table-card">
       <div class="table-wrapper">
         <table v-if="invoices.length > 0">
@@ -174,16 +173,16 @@ const getDescriptionSummary = (invoice: Invoice) => {
               </td>
               <td class="date-cell">{{ formatDate(invoice.created_at) }}</td>
               <td class="actions-cell">
-                <button 
-                  v-if="invoice.status === 'pending'" 
-                  @click="confirmPayment(invoice.id)"
+                <button
+                  v-if="invoice.status === 'pending'"
+                  @click="markAsSent(invoice.id)"
                   class="action-btn confirm"
-                  title="Confirm Payment"
+                  title="Mark as Sent"
                 >
-                  Confirm
+                  Mark as Sent
                 </button>
-                <button 
-                  v-if="invoice.status === 'paid'" 
+                <button
+                  v-if="invoice.status === 'sent'"
                   @click="resendInvoice(invoice.id)"
                   class="action-btn resend"
                   title="Resend Invoice"
@@ -193,15 +192,15 @@ const getDescriptionSummary = (invoice: Invoice) => {
                 <router-link :to="'/edit/' + invoice.id" class="action-btn edit" title="Edit">
                   Edit
                 </router-link>
-                <button 
+                <button
                   @click="downloadPdf(invoice.id, invoice.invoice_number)"
                   class="action-btn view-pdf"
                   title="View PDF"
                 >
                   View PDF
                 </button>
-                <button 
-                  v-if="invoice.status !== 'paid'" 
+                <button
+                  v-if="invoice.status !== 'sent'"
                   @click="deleteInvoice(invoice.id, invoice.invoice_number)"
                   class="action-btn delete"
                   title="Delete"
@@ -212,7 +211,7 @@ const getDescriptionSummary = (invoice: Invoice) => {
             </tr>
           </tbody>
         </table>
-        
+
         <div v-else class="empty-state">
           <div class="empty-illustration">📄</div>
           <h3>No invoices yet</h3>
@@ -350,9 +349,9 @@ tr:hover td {
   text-transform: capitalize;
 }
 
-.status-paid {
-  background: #dcfce7;
-  color: #15803d;
+.status-sent {
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .status-pending {
@@ -389,12 +388,12 @@ tr:hover td {
 }
 
 .action-btn.confirm {
-  background: #10b981;
+  background: #2563eb;
   color: white;
 }
 
 .action-btn.confirm:hover {
-  background: #059669;
+  background: #1d4ed8;
 }
 
 .action-btn.resend {

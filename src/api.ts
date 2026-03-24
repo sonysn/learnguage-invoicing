@@ -19,7 +19,7 @@ api.interceptors.response.use(
       // If the error code is 'token_not_valid', clear tokens and redirect to login
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
-      
+
       // Only redirect if we're not already on the login page
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
@@ -30,3 +30,11 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// Service Templates API
+export const serviceTemplatesApi = {
+  getAll: () => api.get('/service-templates/'),
+  create: (data: { description: string; default_unit_price: number }) => api.post('/service-templates/', data),
+  update: (id: number, data: { description: string; default_unit_price: number }) => api.put(`/service-templates/${id}/`, data),
+  delete: (id: number) => api.delete(`/service-templates/${id}/`),
+};

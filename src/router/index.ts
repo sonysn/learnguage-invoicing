@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import InvoiceList from '../views/InvoiceList.vue';
 import InvoiceForm from '../views/InvoiceForm.vue';
 import Login from '../views/Login.vue';
+import ServiceTemplates from '../views/ServiceTemplates.vue';
 
 const routes = [
   {
@@ -26,6 +27,12 @@ const routes = [
     name: 'InvoiceEdit',
     component: InvoiceForm,
     props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/service-templates',
+    name: 'ServiceTemplates',
+    component: ServiceTemplates,
     meta: { requiresAuth: true }
   },
 ];

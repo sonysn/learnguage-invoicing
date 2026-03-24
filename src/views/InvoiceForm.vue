@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import api from '../api';
+import api, { serviceTemplatesApi } from '../api';
 
 const router = useRouter();
 const route = useRoute();
@@ -10,6 +10,10 @@ const isEdit = computed(() => !!route.params.id);
 const loading = ref(false);
 const saving = ref(false);
 
+// Service templates
+const serviceTemplates = ref<Array<{ id: number; description: string; default_unit_price: number }>>([]);
+const showTemplatesModal = ref(false);
+
 const form = ref({
   recipient_name: '',
   recipient_email: '',
@@ -17,17 +21,57 @@ const form = ref({
   status: 'pending',
   is_recurring: false,
   recurrence_interval: 'none',
+  include_tax: false,
+  tax_percentage: 0,
   items: [
-    { description: '', duration: '', amount: 0 }
+    { id: null as number | null, description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 }
   ]
 });
 
+// Auto-set GST when CAD is selected
+watch(() => form.value.currency, (newCurrency) => {
+  if (newCurrency === 'CAD' && form.value.include_tax) {
+    form.value.tax_percentage = 5; // GST rate
+  }
+});
+
+// Auto-enable tax and set GST when CAD is selected
+watch(() => form.value.currency, (newCurrency) => {
+  if (newCurrency === 'CAD') {
+    form.value.include_tax = true;
+    form.value.tax_percentage = 5; // GST rate
+  } else {
+    form.value.include_tax = false;
+    form.value.tax_percentage = 0;
+  }
+});
+
 const totalAmount = computed(() => {
-  return form.value.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const subtotal = form.value.items.reduce((sum, item) => {
+    return sum + (Number(item.duration_value) || 0) * (Number(item.unit_price) || 0);
+  }, 0);
+  
+  if (form.value.include_tax && form.value.tax_percentage > 0) {
+    return subtotal * (1 + form.value.tax_percentage / 100);
+  }
+  return subtotal;
+});
+
+const subtotal = computed(() => {
+  return form.value.items.reduce((sum, item) => {
+    return sum + (Number(item.duration_value) || 0) * (Number(item.unit_price) || 0);
+  }, 0);
+});
+
+const taxAmount = computed(() => {
+  if (form.value.include_tax && form.value.tax_percentage > 0) {
+    return subtotal.value * (form.value.tax_percentage / 100);
+  }
+  return 0;
 });
 
 const addItem = () => {
-  form.value.items.push({ description: '', duration: '', amount: 0 });
+  form.value.items.push({ id: null, description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 });
 };
 
 const removeItem = (index: number) => {
@@ -36,9 +80,30 @@ const removeItem = (index: number) => {
   }
 };
 
+const loadServiceTemplate = (template: { description: string; default_unit_price: number }) => {
+  // Add a new item with the template's description and price
+  form.value.items.push({
+    id: null,
+    description: template.description,
+    duration_value: 1,
+    duration_unit: 'monthly',
+    unit_price: Number(template.default_unit_price)
+  });
+  showTemplatesModal.value = false;
+};
+
+const fetchServiceTemplates = async () => {
+  try {
+    const response = await serviceTemplatesApi.getAll();
+    serviceTemplates.value = response.data;
+  } catch (err) {
+    console.error('Failed to load service templates');
+  }
+};
+
 const fetchInvoice = async () => {
   if (!isEdit.value) return;
-  
+
   try {
     loading.value = true;
     const response = await api.get(`/invoices/${route.params.id}/`);
@@ -50,11 +115,14 @@ const fetchInvoice = async () => {
       status: data.status,
       is_recurring: data.is_recurring,
       recurrence_interval: data.recurrence_interval,
+      include_tax: data.include_tax || false,
+      tax_percentage: parseFloat(data.tax_percentage) || 0,
       items: data.items.map((item: any) => ({
         id: item.id,
         description: item.description,
-        duration: item.duration,
-        amount: parseFloat(item.amount)
+        duration_value: parseInt(item.duration_value) || 1,
+        duration_unit: item.duration_unit || 'monthly',
+        unit_price: parseFloat(item.unit_price) || 0
       }))
     };
   } catch (err: any) {
@@ -68,10 +136,33 @@ const fetchInvoice = async () => {
 const saveInvoice = async () => {
   try {
     saving.value = true;
+    const payload = {
+      recipient_name: form.value.recipient_name,
+      recipient_email: form.value.recipient_email,
+      currency: form.value.currency,
+      status: form.value.status,
+      is_recurring: form.value.is_recurring,
+      recurrence_interval: form.value.recurrence_interval,
+      include_tax: form.value.include_tax,
+      tax_percentage: form.value.tax_percentage,
+      items: form.value.items.map(item => {
+        const baseItem: any = {
+          description: item.description,
+          duration_value: item.duration_value,
+          duration_unit: item.duration_unit,
+          unit_price: item.unit_price
+        };
+        if (item.id) {
+          baseItem.id = item.id;
+        }
+        return baseItem;
+      })
+    };
+    
     if (isEdit.value) {
-      await api.put(`/invoices/${route.params.id}/`, form.value);
+      await api.put(`/invoices/${route.params.id}/`, payload);
     } else {
-      await api.post('/invoices/', form.value);
+      await api.post('/invoices/', payload);
     }
     router.push('/');
   } catch (err: any) {
@@ -81,7 +172,10 @@ const saveInvoice = async () => {
   }
 };
 
-onMounted(fetchInvoice);
+onMounted(() => {
+  fetchServiceTemplates();
+  fetchInvoice();
+});
 </script>
 
 <template>
@@ -98,7 +192,7 @@ onMounted(fetchInvoice);
       <div class="spinner"></div>
       <p>Loading details...</p>
     </div>
-    
+
     <div v-else class="form-grid">
       <div class="card form-card">
         <form @submit.prevent="saveInvoice">
@@ -121,9 +215,12 @@ onMounted(fetchInvoice);
           <div class="form-section">
             <div class="section-header">
               <h3>Invoice Items</h3>
-              <button type="button" @click="addItem" class="btn-text-primary">+ Add Another Item</button>
+              <div class="header-actions">
+                <button type="button" @click="showTemplatesModal = true" class="btn-text-secondary">📋 Load from Templates</button>
+                <button type="button" @click="addItem" class="btn-text-primary">+ Add Another Item</button>
+              </div>
             </div>
-            
+
             <div class="items-list">
               <div v-for="(item, index) in form.items" :key="index" class="item-row card-sub">
                 <div class="item-main">
@@ -133,22 +230,33 @@ onMounted(fetchInvoice);
                   </div>
                   <div class="form-row">
                     <div class="form-group">
-                      <label>Duration</label>
-                      <input v-model="item.duration" type="text" placeholder="e.g. 4 Weeks" />
+                      <label>Duration Value</label>
+                      <input v-model.number="item.duration_value" type="number" min="1" required placeholder="e.g. 4" />
                     </div>
                     <div class="form-group">
-                      <label>Amount</label>
+                      <label>Duration Unit</label>
+                      <select v-model="item.duration_unit" required>
+                        <option value="monthly">Monthly</option>
+                        <option value="per_hour">Per Hour</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Unit Price</label>
                       <div class="input-with-icon">
                         <span class="currency-symbol">{{ form.currency }}</span>
-                        <input v-model.number="item.amount" type="number" step="0.01" required />
+                        <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required placeholder="0.00" />
                       </div>
                     </div>
                   </div>
+                  <div class="item-total">
+                    <span>Amount: </span>
+                    <strong>{{ form.currency }} {{ ((item.duration_value || 0) * (item.unit_price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</strong>
+                  </div>
                 </div>
-                <button 
-                  v-if="form.items.length > 1" 
-                  type="button" 
-                  @click="removeItem(index)" 
+                <button
+                  v-if="form.items.length > 1"
+                  type="button"
+                  @click="removeItem(index)"
                   class="btn-remove"
                   title="Remove Item"
                 >
@@ -162,7 +270,7 @@ onMounted(fetchInvoice);
             <div class="section-header">
               <h3>Settings</h3>
             </div>
-            
+
             <div class="form-row">
               <div class="form-group">
                 <label>Currency</label>
@@ -171,6 +279,7 @@ onMounted(fetchInvoice);
                   <option value="NGN">NGN (₦)</option>
                   <option value="GBP">GBP (£)</option>
                   <option value="EUR">EUR (€)</option>
+                  <option value="CAD">CAD (C$) - Includes GST</option>
                 </select>
               </div>
               <div class="form-group">
@@ -179,6 +288,26 @@ onMounted(fetchInvoice);
                   <option value="pending">Pending (Awaiting Confirmation)</option>
                   <option value="draft">Save as Draft</option>
                 </select>
+              </div>
+            </div>
+
+            <!-- Tax Toggle -->
+            <div class="tax-toggle">
+              <div class="toggle-info">
+                <label class="toggle-label">Include Taxes</label>
+                <p class="toggle-desc">Add tax percentage to the invoice total</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" v-model="form.include_tax">
+                <span class="slider round"></span>
+              </label>
+            </div>
+
+            <div v-if="form.include_tax" class="tax-options animate-fade-in">
+              <div class="form-group">
+                <label>Tax Percentage (%)</label>
+                <input v-model.number="form.tax_percentage" type="number" step="0.01" min="0" max="100" placeholder="e.g. 5 for GST" />
+                <p v-if="form.currency === 'CAD'" class="help-text">GST (5%) is automatically applied for CAD invoices.</p>
               </div>
             </div>
 
@@ -192,7 +321,7 @@ onMounted(fetchInvoice);
                 <span class="slider round"></span>
               </label>
             </div>
-            
+
             <div v-if="form.is_recurring" class="recurrence-options animate-fade-in">
               <div class="form-group">
                 <label>Frequency</label>
@@ -227,6 +356,15 @@ onMounted(fetchInvoice);
         <h3>Summary</h3>
         <div class="preview-content">
           <div class="preview-item">
+            <span class="label">Subtotal</span>
+            <span class="value">{{ form.currency }} {{ subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+          </div>
+          <div v-if="form.include_tax && form.tax_percentage > 0" class="preview-item">
+            <span class="label">Tax ({{ form.tax_percentage }}%)</span>
+            <span class="value">{{ form.currency }} {{ taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+          </div>
+          <hr />
+          <div class="preview-item">
             <span class="label">Total Amount</span>
             <span class="value big">{{ form.currency }} {{ totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
           </div>
@@ -245,7 +383,35 @@ onMounted(fetchInvoice);
           </div>
         </div>
         <div class="preview-note">
-          <p>ℹ️ PDF will be generated and emailed only after you confirm payment on the dashboard.</p>
+          <p>ℹ️ PDF will be generated and emailed when you mark the invoice as sent from the dashboard.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Service Templates Modal -->
+    <div v-if="showTemplatesModal" class="modal-overlay" @click.self="showTemplatesModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Service Template</h2>
+          <button @click="showTemplatesModal = false" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="serviceTemplates.length === 0" class="empty-state">
+            <p>No service templates available.</p>
+          </div>
+          <div v-else class="templates-list">
+            <div
+              v-for="template in serviceTemplates"
+              :key="template.id"
+              class="template-item"
+              @click="loadServiceTemplate(template)"
+            >
+              <div class="template-info">
+                <strong>{{ template.description }}</strong>
+                <span class="template-price">{{ form.currency }} {{ Number(template.default_unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -261,18 +427,22 @@ h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem; }
 .card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); padding: 2rem; }
 .form-section { margin-bottom: 2.5rem; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.header-actions { display: flex; gap: 0.75rem; }
 h3 { font-size: 1.125rem; font-weight: 700; color: #0f172a; margin: 0; }
 
 .items-list { display: flex; flex-direction: column; gap: 1rem; }
 .card-sub { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.5rem; position: relative; }
 .item-row { display: flex; gap: 1rem; align-items: flex-start; }
 .item-main { flex-grow: 1; }
+.item-total { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; font-size: 0.875rem; color: #64748b; }
 
 .btn-remove { position: absolute; top: 0.5rem; right: 0.5rem; width: 24px; height: 24px; border-radius: 50%; border: none; background: #fee2e2; color: #b91c1c; font-size: 1.25rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .btn-remove:hover { background: #fecaca; transform: scale(1.1); }
 
 .btn-text-primary { background: none; border: none; color: #2563eb; font-weight: 600; font-size: 0.875rem; cursor: pointer; }
 .btn-text-primary:hover { text-decoration: underline; }
+.btn-text-secondary { background: none; border: none; color: #475569; font-weight: 600; font-size: 0.875rem; cursor: pointer; }
+.btn-text-secondary:hover { text-decoration: underline; }
 
 .form-group { margin-bottom: 1.25rem; }
 label { display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
@@ -280,12 +450,14 @@ label { display: block; font-size: 0.875rem; font-weight: 600; color: #475569; m
 input[type="text"], input[type="email"], input[type="number"], textarea, select { width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; transition: all 0.2s; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
 .input-with-icon { position: relative; display: flex; align-items: center; }
 .currency-symbol { position: absolute; left: 0.75rem; font-weight: 700; color: #94a3b8; font-size: 0.875rem; }
-.input-with-icon input { padding-left: 3rem; }
+.input-with-icon input { padding-left: 2.5rem; }
 
-.recurring-toggle { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-top: 1rem; }
+.help-text { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+
+.tax-toggle, .recurring-toggle { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-top: 1rem; }
 .toggle-desc { font-size: 0.8125rem; color: #64748b; margin: 0; }
 .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
 .switch input { opacity: 0; width: 0; height: 0; }
@@ -293,6 +465,8 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: #2563eb; }
 input:checked + .slider:before { transform: translateX(20px); }
+
+.tax-options { background: #f8fafc; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-top: 1rem; }
 
 .radio-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
 .radio-card { border: 1px solid #e2e8f0; padding: 0.75rem; border-radius: 0.5rem; text-align: center; cursor: pointer; font-weight: 600; font-size: 0.875rem; color: #64748b; }
@@ -308,6 +482,18 @@ input:checked + .slider:before { transform: translateX(20px); }
 hr { border: 0; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
 .preview-note { margin-top: 2rem; padding: 1rem; background: #fff; border-radius: 0.5rem; border: 1px solid #e2e8f0; font-size: 0.8125rem; color: #475569; }
 
+/* Modal Styles */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-content { background: white; border-radius: 1rem; padding: 2rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.modal-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+.btn-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
+.templates-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.template-item { padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; }
+.template-item:hover { background: #f8fafc; border-color: #2563eb; }
+.template-info { display: flex; justify-content: space-between; align-items: center; }
+.template-price { font-weight: 600; color: #2563eb; }
+
 @media (max-width: 1024px) { .form-grid { grid-template-columns: 1fr; } .preview-card { position: static; } }
-@media (prefers-color-scheme: dark) { .card { background: #1e293b; border-color: #334155; } .preview-card { background: #1a2233; } h3, .preview-item .value { color: #f8fafc; } input, textarea, select { background: #0f172a; border-color: #334155; color: #f1f5f9; } .card-sub, .recurring-toggle, .preview-note { background: #0f172a; border-color: #334155; } .radio-card { border-color: #334155; } }
+@media (prefers-color-scheme: dark) { .card { background: #1e293b; border-color: #334155; } .preview-card { background: #1a2233; } h3, .preview-item .value { color: #f8fafc; } input, textarea, select { background: #0f172a; border-color: #334155; color: #f1f5f9; } .card-sub, .recurring-toggle, .preview-note, .tax-toggle, .tax-options { background: #0f172a; border-color: #334155; } .radio-card { border-color: #334155; } .modal-content { background: #1e293b; } .template-item { border-color: #334155; } .template-item:hover { background: #0f172a; } }
 </style>

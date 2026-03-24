@@ -31,6 +31,7 @@ const logout = () => {
         
         <div class="nav-links">
           <router-link to="/" class="nav-item">Dashboard</router-link>
+          <router-link to="/service-templates" class="nav-item">Service Templates</router-link>
           <router-link to="/new" class="nav-item btn-create">Create Invoice</router-link>
           <button @click="logout" class="btn-logout">Logout</button>
         </div>
