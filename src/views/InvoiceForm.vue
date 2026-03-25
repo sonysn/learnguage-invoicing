@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api, { serviceTemplatesApi } from '../api';
 
@@ -15,35 +15,22 @@ const serviceTemplates = ref<Array<{ id: number; description: string; default_un
 const showTemplatesModal = ref(false);
 
 const form = ref({
+  recipient_title: '',
   recipient_name: '',
   recipient_email: '',
   currency: 'USD',
   status: 'pending',
+  invoice_date: '',
+  due_date: '',
   is_recurring: false,
   recurrence_interval: 'none',
+  next_invoice_date: '',
+  recurring_end_date: '',
   include_tax: false,
   tax_percentage: 0,
   items: [
     { id: null as number | null, description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 }
   ]
-});
-
-// Auto-set GST when CAD is selected
-watch(() => form.value.currency, (newCurrency) => {
-  if (newCurrency === 'CAD' && form.value.include_tax) {
-    form.value.tax_percentage = 5; // GST rate
-  }
-});
-
-// Auto-enable tax and set GST when CAD is selected
-watch(() => form.value.currency, (newCurrency) => {
-  if (newCurrency === 'CAD') {
-    form.value.include_tax = true;
-    form.value.tax_percentage = 5; // GST rate
-  } else {
-    form.value.include_tax = false;
-    form.value.tax_percentage = 0;
-  }
 });
 
 const totalAmount = computed(() => {
@@ -109,14 +96,19 @@ const fetchInvoice = async () => {
     const response = await api.get(`/invoices/${route.params.id}/`);
     const data = response.data;
     form.value = {
+      recipient_title: data.recipient_title || '',
       recipient_name: data.recipient_name,
       recipient_email: data.recipient_email,
       currency: data.currency,
       status: data.status,
       is_recurring: data.is_recurring,
       recurrence_interval: data.recurrence_interval,
+      next_invoice_date: data.next_invoice_date ? new Date(data.next_invoice_date).toISOString().split('T')[0] : '',
+      recurring_end_date: data.recurring_end_date ? new Date(data.recurring_end_date).toISOString().split('T')[0] : '',
       include_tax: data.include_tax || false,
       tax_percentage: parseFloat(data.tax_percentage) || 0,
+      invoice_date: data.invoice_date ? new Date(data.invoice_date).toISOString().split('T')[0] : '',
+      due_date: data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '',
       items: data.items.map((item: any) => ({
         id: item.id,
         description: item.description,
@@ -137,12 +129,17 @@ const saveInvoice = async () => {
   try {
     saving.value = true;
     const payload = {
+      recipient_title: form.value.recipient_title,
       recipient_name: form.value.recipient_name,
       recipient_email: form.value.recipient_email,
       currency: form.value.currency,
       status: form.value.status,
+      invoice_date: form.value.invoice_date || null,
+      due_date: form.value.due_date || null,
       is_recurring: form.value.is_recurring,
       recurrence_interval: form.value.recurrence_interval,
+      next_invoice_date: form.value.next_invoice_date || null,
+      recurring_end_date: form.value.recurring_end_date || null,
       include_tax: form.value.include_tax,
       tax_percentage: form.value.tax_percentage,
       items: form.value.items.map(item => {
@@ -202,12 +199,41 @@ onMounted(() => {
             </div>
             <div class="form-row">
               <div class="form-group">
+                <label>Title</label>
+                <select v-model="form.recipient_title">
+                  <option value="">Select...</option>
+                  <option value="Mr">Mr</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Dr">Dr</option>
+                  <option value="Prof">Prof</option>
+                  <option value="Rev">Rev</option>
+                  <option value="Mx">Mx</option>
+                </select>
+              </div>
+              <div class="form-group">
                 <label>Recipient Name</label>
-                <input v-model="form.recipient_name" type="text" required placeholder="e.g. Mr. & Mrs. Fakunle" />
+                <input v-model="form.recipient_name" type="text" required placeholder="e.g. John Fakunle" />
               </div>
               <div class="form-group">
                 <label>Recipient Email</label>
                 <input v-model="form.recipient_email" type="email" required placeholder="customer@example.com" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-header">
+              <h3>Invoice Dates</h3>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invoice Date</label>
+                <input v-model="form.invoice_date" type="date" />
+              </div>
+              <div class="form-group">
+                <label>Due Date</label>
+                <input v-model="form.due_date" type="date" />
               </div>
             </div>
           </div>
@@ -279,7 +305,7 @@ onMounted(() => {
                   <option value="NGN">NGN (₦)</option>
                   <option value="GBP">GBP (£)</option>
                   <option value="EUR">EUR (€)</option>
-                  <option value="CAD">CAD (C$) - Includes GST</option>
+                  <option value="CAD">CAD (C$)</option>
                 </select>
               </div>
               <div class="form-group">
@@ -291,11 +317,11 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Tax Toggle -->
-            <div class="tax-toggle">
+            <!-- Tax Toggle - Only for CAD and USD -->
+            <div class="tax-toggle" v-if="['CAD', 'USD'].includes(form.currency)">
               <div class="toggle-info">
-                <label class="toggle-label">Include Taxes</label>
-                <p class="toggle-desc">Add tax percentage to the invoice total</p>
+                <label class="toggle-label">Include Taxes (GST)</label>
+                <p class="toggle-desc">Add GST percentage to the invoice total</p>
               </div>
               <label class="switch">
                 <input type="checkbox" v-model="form.include_tax">
@@ -305,9 +331,9 @@ onMounted(() => {
 
             <div v-if="form.include_tax" class="tax-options animate-fade-in">
               <div class="form-group">
-                <label>Tax Percentage (%)</label>
-                <input v-model.number="form.tax_percentage" type="number" step="0.01" min="0" max="100" placeholder="e.g. 5 for GST" />
-                <p v-if="form.currency === 'CAD'" class="help-text">GST (5%) is automatically applied for CAD invoices.</p>
+                <label>GST Percentage (%)</label>
+                <input v-model.number="form.tax_percentage" type="number" step="0.01" min="0" max="100" placeholder="e.g. 5" />
+                <p class="help-text">Standard GST rate is 5% for Canada and varies for US.</p>
               </div>
             </div>
 
@@ -323,22 +349,41 @@ onMounted(() => {
             </div>
 
             <div v-if="form.is_recurring" class="recurrence-options animate-fade-in">
-              <div class="form-group">
-                <label>Frequency</label>
-                <div class="radio-group">
-                  <label class="radio-card" :class="{ active: form.recurrence_interval === 'weekly' }">
-                    <input type="radio" v-model="form.recurrence_interval" value="weekly" />
-                    <span>Weekly</span>
-                  </label>
-                  <label class="radio-card" :class="{ active: form.recurrence_interval === 'monthly' }">
-                    <input type="radio" v-model="form.recurrence_interval" value="monthly" />
-                    <span>Monthly</span>
-                  </label>
-                  <label class="radio-card" :class="{ active: form.recurrence_interval === 'yearly' }">
-                    <input type="radio" v-model="form.recurrence_interval" value="yearly" />
-                    <span>Yearly</span>
-                  </label>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Frequency</label>
+                  <div class="radio-group">
+                    <label class="radio-card" :class="{ active: form.recurrence_interval === 'weekly' }">
+                      <input type="radio" v-model="form.recurrence_interval" value="weekly" />
+                      <span>Weekly</span>
+                    </label>
+                    <label class="radio-card" :class="{ active: form.recurrence_interval === 'monthly' }">
+                      <input type="radio" v-model="form.recurrence_interval" value="monthly" />
+                      <span>Monthly</span>
+                    </label>
+                    <label class="radio-card" :class="{ active: form.recurrence_interval === 'quarterly' }">
+                      <input type="radio" v-model="form.recurrence_interval" value="quarterly" />
+                      <span>Quarterly</span>
+                    </label>
+                    <label class="radio-card" :class="{ active: form.recurrence_interval === 'yearly' }">
+                      <input type="radio" v-model="form.recurrence_interval" value="yearly" />
+                      <span>Yearly</span>
+                    </label>
+                  </div>
                 </div>
+                <div class="form-group">
+                  <label>Next Invoice Date *</label>
+                  <input v-model="form.next_invoice_date" type="date" required />
+                  <p class="help-text">The date when the next invoice will be automatically generated and sent.</p>
+                </div>
+                <div class="form-group">
+                  <label>End Date (Optional)</label>
+                  <input v-model="form.recurring_end_date" type="date" />
+                  <p class="help-text">Recurring will stop after this date. Leave empty for indefinite.</p>
+                </div>
+              </div>
+              <div class="recurring-note">
+                <p>ℹ️ A new invoice will be automatically generated and sent on the Next Invoice Date. Subsequent invoices will be created every <strong>{{ form.recurrence_interval }}</strong> until the End Date (or indefinitely if no end date is set).</p>
               </div>
             </div>
           </div>
@@ -451,11 +496,15 @@ input[type="text"], input[type="email"], input[type="number"], textarea, select 
 input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.recurrence-options .form-row { grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
 .input-with-icon { position: relative; display: flex; align-items: center; }
 .currency-symbol { position: absolute; left: 0.75rem; font-weight: 700; color: #94a3b8; font-size: 0.875rem; }
 .input-with-icon input { padding-left: 2.5rem; }
 
 .help-text { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+
+.recurring-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 0.5rem; padding: 1rem; margin-top: 1rem; }
+.recurring-note p { margin: 0; font-size: 0.8125rem; color: #1e40af; }
 
 .tax-toggle, .recurring-toggle { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; margin-top: 1rem; }
 .toggle-desc { font-size: 0.8125rem; color: #64748b; margin: 0; }

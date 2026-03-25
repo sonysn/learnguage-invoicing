@@ -11,6 +11,9 @@ interface Invoice {
   currency: string;
   status: string;
   created_at: string;
+  is_recurring: boolean;
+  recurrence_interval: string;
+  next_invoice_date: string | null;
   items: Array<{ description: string }>;
 }
 
@@ -105,6 +108,28 @@ const getDescriptionSummary = (invoice: Invoice) => {
   if (invoice.items.length === 1) return invoice.items[0].description;
   return `${invoice.items[0].description} (+${invoice.items.length - 1} more)`;
 };
+
+const getRecurringLabel = (invoice: Invoice) => {
+  if (!invoice.is_recurring) return null;
+  const interval = invoice.recurrence_interval || 'none';
+  if (interval === 'none') return null;
+  
+  let label = interval.charAt(0).toUpperCase() + interval.slice(1);
+  if (invoice.next_invoice_date) {
+    const nextDate = new Date(invoice.next_invoice_date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    label += ` • Next: ${nextDate}`;
+  }
+  return label;
+};
+
+const getRecurringClass = (invoice: Invoice) => {
+  if (!invoice.is_recurring) return '';
+  const interval = invoice.recurrence_interval;
+  return `recurring-${interval}`;
+};
 </script>
 
 <template>
@@ -143,6 +168,7 @@ const getDescriptionSummary = (invoice: Invoice) => {
               <th>Description</th>
               <th>Amount</th>
               <th>Status</th>
+              <th>Recurring</th>
               <th>Date</th>
               <th class="text-right">Actions</th>
             </tr>
@@ -170,6 +196,12 @@ const getDescriptionSummary = (invoice: Invoice) => {
                 <span :class="['status-pill', getStatusClass(invoice.status)]">
                   {{ invoice.status }}
                 </span>
+              </td>
+              <td>
+                <span v-if="getRecurringLabel(invoice)" :class="['recurring-pill', getRecurringClass(invoice)]">
+                  {{ getRecurringLabel(invoice) }}
+                </span>
+                <span v-else class="no-recurring">—</span>
               </td>
               <td class="date-cell">{{ formatDate(invoice.created_at) }}</td>
               <td class="actions-cell">
@@ -367,6 +399,27 @@ tr:hover td {
 .status-draft {
   background: #f1f5f9;
   color: #475569;
+}
+
+/* Recurring Pills */
+.recurring-pill {
+  display: inline-flex;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.recurring-weekly { background: #dcfce7; color: #166534; }
+.recurring-monthly { background: #fef9c3; color: #854d0e; }
+.recurring-quarterly { background: #fed7aa; color: #9a3412; }
+.recurring-yearly { background: #e0e7ff; color: #3730a3; }
+
+.no-recurring {
+  color: #cbd5e1;
+  font-size: 1.25rem;
 }
 
 /* Actions */
