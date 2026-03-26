@@ -4,8 +4,10 @@ import { serviceTemplatesApi } from '../api';
 
 interface ServiceTemplate {
   id: number;
+  item_name: string;
   description: string;
   default_unit_price: number;
+  currency: string;
 }
 
 const templates = ref<ServiceTemplate[]>([]);
@@ -15,8 +17,10 @@ const showFormModal = ref(false);
 const editingTemplate = ref<ServiceTemplate | null>(null);
 
 const form = ref({
+  item_name: '',
   description: '',
-  default_unit_price: 0
+  default_unit_price: 0,
+  currency: 'USD'
 });
 
 const fetchTemplates = async () => {
@@ -33,15 +37,17 @@ const fetchTemplates = async () => {
 
 const openCreateModal = () => {
   editingTemplate.value = null;
-  form.value = { description: '', default_unit_price: 0 };
+  form.value = { item_name: '', description: '', default_unit_price: 0, currency: 'USD' };
   showFormModal.value = true;
 };
 
 const openEditModal = (template: ServiceTemplate) => {
   editingTemplate.value = template;
   form.value = {
+    item_name: template.item_name,
     description: template.description,
-    default_unit_price: Number(template.default_unit_price)
+    default_unit_price: Number(template.default_unit_price),
+    currency: template.currency
   };
   showFormModal.value = true;
 };
@@ -72,8 +78,8 @@ const saveTemplate = async () => {
   }
 };
 
-const deleteTemplate = async (id: number, description: string) => {
-  if (!confirm(`Are you sure you want to delete "${description}"? This cannot be undone.`)) return;
+const deleteTemplate = async (id: number, item_name: string) => {
+  if (!confirm(`Are you sure you want to delete "${item_name}"? This cannot be undone.`)) return;
 
   try {
     await serviceTemplatesApi.delete(id);
@@ -115,18 +121,26 @@ const formatPrice = (price: number) => {
         <table v-if="templates.length > 0">
           <thead>
             <tr>
-              <th>Description</th>
+              <th>Item Name</th>
+              <th>Currency</th>
               <th>Default Price</th>
+              <th>Description</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="template in templates" :key="template.id">
               <td>
-                <span class="description-text">{{ template.description }}</span>
+                <span class="item-name-text">{{ template.item_name }}</span>
               </td>
               <td>
-                <span class="price-text">${{ formatPrice(template.default_unit_price) }}</span>
+                <span class="currency-badge">{{ template.currency }}</span>
+              </td>
+              <td>
+                <span class="price-text">{{ template.currency }} {{ formatPrice(template.default_unit_price) }}</span>
+              </td>
+              <td class="description-cell">
+                {{ template.description || '---' }}
               </td>
               <td class="actions-cell">
                 <button
@@ -137,7 +151,7 @@ const formatPrice = (price: number) => {
                   Edit
                 </button>
                 <button
-                  @click="deleteTemplate(template.id, template.description)"
+                  @click="deleteTemplate(template.id, template.item_name)"
                   class="action-btn delete"
                   title="Delete"
                 >
@@ -166,24 +180,44 @@ const formatPrice = (price: number) => {
         </div>
         <form @submit.prevent="saveTemplate">
           <div class="form-group">
+            <label>Item Name *</label>
+            <input
+              v-model="form.item_name"
+              type="text"
+              required
+              placeholder="e.g. Spanish Tutoring"
+            />
+          </div>
+          <div class="form-group">
             <label>Description</label>
             <textarea
               v-model="form.description"
-              required
               rows="3"
-              placeholder="e.g. Spanish Tutoring - Group Class"
+              placeholder="Detailed description of the service..."
             ></textarea>
           </div>
-          <div class="form-group">
-            <label>Default Unit Price ($)</label>
-            <input
-              v-model.number="form.default_unit_price"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              placeholder="0.00"
-            />
+          <div class="form-row">
+            <div class="form-group">
+              <label>Currency *</label>
+              <select v-model="form.currency" required>
+                <option value="USD">USD ($)</option>
+                <option value="NGN">NGN (₦)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="CAD">CAD (C$)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Default Unit Price *</label>
+              <input
+                v-model.number="form.default_unit_price"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                placeholder="0.00"
+              />
+            </div>
           </div>
           <div class="form-footer">
             <button type="button" @click="showFormModal = false" class="btn-secondary">Cancel</button>
@@ -226,6 +260,11 @@ tr:hover td { background-color: #f8fafc; }
 .empty-illustration { font-size: 4rem; margin-bottom: 1.5rem; }
 .empty-state h3 { margin-bottom: 0.5rem; }
 .empty-state p { color: #64748b; margin-bottom: 2rem; }
+
+.item-name-text { font-weight: 600; color: #0f172a; }
+.currency-badge { display: inline-block; padding: 0.25rem 0.5rem; background: #f1f5f9; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #475569; }
+.price-text { font-weight: 700; color: #2563eb; font-size: 0.9375rem; }
+.description-cell { max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 0.8125rem; }
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }

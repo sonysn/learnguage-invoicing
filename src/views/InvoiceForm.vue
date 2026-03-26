@@ -11,7 +11,7 @@ const loading = ref(false);
 const saving = ref(false);
 
 // Service templates
-const serviceTemplates = ref<Array<{ id: number; description: string; default_unit_price: number }>>([]);
+const serviceTemplates = ref<Array<{ id: number; item_name: string; description: string; default_unit_price: number; currency: string }>>([]);
 const showTemplatesModal = ref(false);
 
 const form = ref({
@@ -67,12 +67,12 @@ const removeItem = (index: number) => {
   }
 };
 
-const loadServiceTemplate = (template: { description: string; default_unit_price: number }) => {
-  // Add a new item with the template's description and price
+const loadServiceTemplate = (template: { id: number; item_name: string; description: string; default_unit_price: number; currency: string }) => {
+  // Add a new item with the template's item_name, description and price
   form.value.items.push({
     id: null,
-    item_name: template.description,
-    description: '',
+    item_name: template.item_name,
+    description: template.description,
     duration_value: 1,
     duration_unit: 'monthly',
     unit_price: Number(template.default_unit_price)
@@ -461,8 +461,12 @@ onMounted(() => {
               @click="loadServiceTemplate(template)"
             >
               <div class="template-info">
-                <strong>{{ template.description }}</strong>
-                <span class="template-price">{{ form.currency }} {{ Number(template.default_unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</span>
+                <div>
+                  <strong>{{ template.item_name }}</strong>
+                  <span class="template-currency">{{ template.currency }}</span>
+                </div>
+                <div class="template-price">{{ template.currency }} {{ Number(template.default_unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</div>
+                <p v-if="template.description" class="template-description">{{ template.description }}</p>
               </div>
             </div>
           </div>
@@ -549,8 +553,10 @@ hr { border: 0; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
 .templates-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .template-item { padding: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; }
 .template-item:hover { background: #f8fafc; border-color: #2563eb; }
-.template-info { display: flex; justify-content: space-between; align-items: center; }
-.template-price { font-weight: 600; color: #2563eb; }
+.template-info { display: flex; flex-direction: column; gap: 0.25rem; }
+.template-currency { display: inline-block; margin-left: 0.5rem; padding: 0.125rem 0.5rem; background: #f1f5f9; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; color: #475569; }
+.template-price { font-weight: 700; color: #2563eb; font-size: 0.9375rem; }
+.template-description { font-size: 0.8125rem; color: #64748b; margin: 0.25rem 0 0 0; }
 
 @media (max-width: 1024px) { .form-grid { grid-template-columns: 1fr; } .preview-card { position: static; } }
 @media (prefers-color-scheme: dark) { .card { background: #1e293b; border-color: #334155; } .preview-card { background: #1a2233; } h3, .preview-item .value { color: #f8fafc; } input, textarea, select { background: #0f172a; border-color: #334155; color: #f1f5f9; } .card-sub, .recurring-toggle, .preview-note, .tax-toggle, .tax-options { background: #0f172a; border-color: #334155; } .radio-card { border-color: #334155; } .modal-content { background: #1e293b; } .template-item { border-color: #334155; } .template-item:hover { background: #0f172a; } }
