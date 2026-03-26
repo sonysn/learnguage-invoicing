@@ -270,6 +270,17 @@ onMounted(() => {
 
           <div class="form-section">
             <div class="section-header">
+              <h3>Notes (Optional)</h3>
+            </div>
+            <div class="form-group">
+              <label>Short Note for Invoice</label>
+              <textarea v-model="form.notes" rows="3" maxlength="500" placeholder="Add a short note to include on the invoice (max 500 characters). This will appear below the items table in the PDF." />
+              <p class="help-text">This note will be displayed on the PDF invoice below the items table.</p>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-header">
               <h3>Invoice Items</h3>
               <div class="header-actions">
                 <button type="button" @click="showTemplatesModal = true" class="btn-text-secondary">📋 Load from Templates</button>
