@@ -256,7 +256,7 @@ onMounted(() => {
             <div class="section-header">
               <h3>Invoice Dates</h3>
             </div>
-            <div class="form-row">
+            <div class="form-row-dates">
               <div class="form-group">
                 <label>Invoice Date</label>
                 <input v-model="form.invoice_date" type="date" />
@@ -265,17 +265,6 @@ onMounted(() => {
                 <label>Due Date</label>
                 <input v-model="form.due_date" type="date" />
               </div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Notes (Optional)</h3>
-            </div>
-            <div class="form-group">
-              <label>Short Note for Invoice</label>
-              <textarea v-model="form.notes" rows="3" maxlength="500" placeholder="Add a short note to include on the invoice (max 500 characters). This will appear below the items table in the PDF." />
-              <p class="help-text">This note will be displayed on the PDF invoice below the items table.</p>
             </div>
           </div>
 
@@ -316,8 +305,8 @@ onMounted(() => {
                     <div class="form-group">
                       <label>Duration Unit</label>
                       <select v-model="item.duration_unit" required>
-                        <option value="monthly">Monthly</option>
-                        <option value="per_hour">Per Hour</option>
+                        <option value="monthly">Month</option>
+                        <option value="per_hour">Hour</option>
                       </select>
                     </div>
                   </div>
@@ -435,6 +424,17 @@ onMounted(() => {
             </div>
           </div>
 
+          <div class="form-section">
+            <div class="section-header">
+              <h3>Notes (Optional)</h3>
+            </div>
+            <div class="form-group">
+              <label>Short Note for Invoice</label>
+              <textarea v-model="form.notes" rows="4" maxlength="500" placeholder="Add a short note to include on the invoice (max 500 characters). This will appear below the items table in the PDF." />
+              <p class="help-text">This note will be displayed on the PDF invoice below the items table.</p>
+            </div>
+          </div>
+
           <div class="form-footer">
             <button type="button" @click="router.push('/')" class="btn-secondary">Cancel</button>
             <button type="submit" class="btn-primary" :disabled="saving">
@@ -547,7 +547,8 @@ input[type="text"], input[type="email"], input[type="number"], textarea, select 
 input:focus, textarea:focus, select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-.recurrence-options .form-row { grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+.form-row-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.form-row-dates .form-group { margin-bottom: 0; }
 .input-with-icon { position: relative; display: flex; align-items: center; }
 .currency-symbol { position: absolute; left: 0.75rem; font-weight: 700; color: #94a3b8; font-size: 0.875rem; }
 .input-with-icon input { padding-left: 2.5rem; }
