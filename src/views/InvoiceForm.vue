@@ -16,6 +16,7 @@ const showTemplatesModal = ref(false);
 
 const form = ref({
   recipient_title: '',
+  recipient_title_custom: '',
   recipient_name: '',
   recipient_email: '',
   currency: 'USD',
@@ -28,9 +29,17 @@ const form = ref({
   recurring_end_date: '',
   include_tax: false,
   tax_percentage: 0,
+  notes: '',
   items: [
     { id: null as number | null, item_name: '', description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 }
   ]
+});
+
+const getFullTitle = computed(() => {
+  if (form.value.recipient_title === 'custom') {
+    return form.value.recipient_title_custom;
+  }
+  return form.value.recipient_title;
 });
 
 const totalAmount = computed(() => {
@@ -96,29 +105,39 @@ const fetchInvoice = async () => {
     loading.value = true;
     const response = await api.get(`/invoices/${route.params.id}/`);
     const data = response.data;
-    form.value = {
-      recipient_title: data.recipient_title || '',
-      recipient_name: data.recipient_name,
-      recipient_email: data.recipient_email,
-      currency: data.currency,
-      status: data.status,
-      is_recurring: data.is_recurring,
-      recurrence_interval: data.recurrence_interval,
-      next_invoice_date: data.next_invoice_date ? new Date(data.next_invoice_date).toISOString().split('T')[0] : '',
-      recurring_end_date: data.recurring_end_date ? new Date(data.recurring_end_date).toISOString().split('T')[0] : '',
-      include_tax: data.include_tax || false,
-      tax_percentage: parseFloat(data.tax_percentage) || 0,
-      invoice_date: data.invoice_date ? new Date(data.invoice_date).toISOString().split('T')[0] : '',
-      due_date: data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '',
-      items: data.items.map((item: any) => ({
-        id: item.id,
-        item_name: item.item_name || '',
-        description: item.description,
-        duration_value: parseInt(item.duration_value) || 1,
-        duration_unit: item.duration_unit || 'monthly',
-        unit_price: parseFloat(item.unit_price) || 0
-      }))
-    };
+    const title = data.recipient_title || '';
+    
+    // Check if it's a predefined title or custom
+    const predefinedTitles = ['', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Rev', 'Chief', 'custom'];
+    if (predefinedTitles.includes(title)) {
+      form.value.recipient_title = title;
+      form.value.recipient_title_custom = '';
+    } else {
+      form.value.recipient_title = 'custom';
+      form.value.recipient_title_custom = title;
+    }
+    
+    form.value.recipient_name = data.recipient_name;
+    form.value.recipient_email = data.recipient_email;
+    form.value.currency = data.currency;
+    form.value.status = data.status;
+    form.value.is_recurring = data.is_recurring;
+    form.value.recurrence_interval = data.recurrence_interval;
+    form.value.next_invoice_date = data.next_invoice_date ? new Date(data.next_invoice_date).toISOString().split('T')[0] : '';
+    form.value.recurring_end_date = data.recurring_end_date ? new Date(data.recurring_end_date).toISOString().split('T')[0] : '';
+    form.value.include_tax = data.include_tax || false;
+    form.value.tax_percentage = parseFloat(data.tax_percentage) || 0;
+    form.value.invoice_date = data.invoice_date ? new Date(data.invoice_date).toISOString().split('T')[0] : '';
+    form.value.due_date = data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '';
+    form.value.notes = data.notes || '';
+    form.value.items = data.items.map((item: any) => ({
+      id: item.id,
+      item_name: item.item_name || '',
+      description: item.description,
+      duration_value: parseInt(item.duration_value) || 1,
+      duration_unit: item.duration_unit || 'monthly',
+      unit_price: parseFloat(item.unit_price) || 0
+    }));
   } catch (err: any) {
     alert('Failed to load invoice details.');
     router.push('/');
@@ -131,7 +150,7 @@ const saveInvoice = async () => {
   try {
     saving.value = true;
     const payload = {
-      recipient_title: form.value.recipient_title,
+      recipient_title: getFullTitle.value,
       recipient_name: form.value.recipient_name,
       recipient_email: form.value.recipient_email,
       currency: form.value.currency,
@@ -144,6 +163,7 @@ const saveInvoice = async () => {
       recurring_end_date: form.value.recurring_end_date || null,
       include_tax: form.value.include_tax,
       tax_percentage: form.value.tax_percentage,
+      notes: form.value.notes,
       items: form.value.items.map(item => {
         const baseItem: any = {
           item_name: item.item_name,
@@ -204,21 +224,28 @@ onMounted(() => {
               <div class="form-group">
                 <label>Title</label>
                 <select v-model="form.recipient_title">
-                  <option value="">Select...</option>
+                  <option value="">None</option>
                   <option value="Mr">Mr</option>
                   <option value="Mrs">Mrs</option>
                   <option value="Ms">Ms</option>
                   <option value="Dr">Dr</option>
                   <option value="Prof">Prof</option>
                   <option value="Rev">Rev</option>
-                  <option value="Mx">Mx</option>
+                  <option value="Chief">Chief</option>
+                  <option value="custom">Custom...</option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label>Custom Title</label>
+                <input v-model="form.recipient_title_custom" type="text" :disabled="form.recipient_title !== 'custom'" placeholder="e.g. Alhaji, Barr., etc." />
               </div>
               <div class="form-group">
                 <label>Recipient Name</label>
                 <input v-model="form.recipient_name" type="text" required placeholder="e.g. John Fakunle" />
               </div>
-              <div class="form-group">
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="grid-column: span 3;">
                 <label>Recipient Email</label>
                 <input v-model="form.recipient_email" type="email" required placeholder="customer@example.com" />
               </div>
