@@ -29,7 +29,7 @@ const form = ref({
   include_tax: false,
   tax_percentage: 0,
   items: [
-    { id: null as number | null, description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 }
+    { id: null as number | null, item_name: '', description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 }
   ]
 });
 
@@ -58,7 +58,7 @@ const taxAmount = computed(() => {
 });
 
 const addItem = () => {
-  form.value.items.push({ id: null, description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 });
+  form.value.items.push({ id: null, item_name: '', description: '', duration_value: 1, duration_unit: 'monthly', unit_price: 0 });
 };
 
 const removeItem = (index: number) => {
@@ -71,7 +71,8 @@ const loadServiceTemplate = (template: { description: string; default_unit_price
   // Add a new item with the template's description and price
   form.value.items.push({
     id: null,
-    description: template.description,
+    item_name: template.description,
+    description: '',
     duration_value: 1,
     duration_unit: 'monthly',
     unit_price: Number(template.default_unit_price)
@@ -111,6 +112,7 @@ const fetchInvoice = async () => {
       due_date: data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '',
       items: data.items.map((item: any) => ({
         id: item.id,
+        item_name: item.item_name || '',
         description: item.description,
         duration_value: parseInt(item.duration_value) || 1,
         duration_unit: item.duration_unit || 'monthly',
@@ -144,6 +146,7 @@ const saveInvoice = async () => {
       tax_percentage: form.value.tax_percentage,
       items: form.value.items.map(item => {
         const baseItem: any = {
+          item_name: item.item_name,
           description: item.description,
           duration_value: item.duration_value,
           duration_unit: item.duration_unit,
@@ -250,9 +253,22 @@ onMounted(() => {
             <div class="items-list">
               <div v-for="(item, index) in form.items" :key="index" class="item-row card-sub">
                 <div class="item-main">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Item Name *</label>
+                      <input v-model="item.item_name" type="text" required placeholder="e.g. Spanish Tutoring" />
+                    </div>
+                    <div class="form-group">
+                      <label>Unit Price</label>
+                      <div class="input-with-icon">
+                        <span class="currency-symbol">{{ form.currency }}</span>
+                        <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required placeholder="0.00" />
+                      </div>
+                    </div>
+                  </div>
                   <div class="form-group">
                     <label>Description</label>
-                    <textarea v-model="item.description" required rows="2" placeholder="Item description..."></textarea>
+                    <textarea v-model="item.description" required rows="2" placeholder="Detailed description of the item..."></textarea>
                   </div>
                   <div class="form-row">
                     <div class="form-group">
@@ -265,13 +281,6 @@ onMounted(() => {
                         <option value="monthly">Monthly</option>
                         <option value="per_hour">Per Hour</option>
                       </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Unit Price</label>
-                      <div class="input-with-icon">
-                        <span class="currency-symbol">{{ form.currency }}</span>
-                        <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required placeholder="0.00" />
-                      </div>
                     </div>
                   </div>
                   <div class="item-total">
