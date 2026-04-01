@@ -13,6 +13,7 @@ const saving = ref(false);
 // Service templates
 const serviceTemplates = ref<Array<{ id: number; item_name: string; description: string; default_unit_price: number; currency: string }>>([]);
 const showTemplatesModal = ref(false);
+const activeItemIndex = ref(0);
 
 const form = ref({
   recipient_title: '',
@@ -76,16 +77,22 @@ const removeItem = (index: number) => {
   }
 };
 
+const setActiveItem = (index: number) => {
+  activeItemIndex.value = index;
+};
+
 const loadServiceTemplate = (template: { id: number; item_name: string; description: string; default_unit_price: number; currency: string }) => {
-  // Add a new item with the template's item_name, description and price
-  form.value.items.push({
-    id: null,
-    item_name: template.item_name,
-    description: template.description,
-    duration_value: 1,
-    duration_unit: 'monthly',
-    unit_price: Number(template.default_unit_price)
-  });
+  // Update currency to match the template's currency
+  form.value.currency = template.currency;
+
+  // Update the active item with template data
+  const activeItem = form.value.items[activeItemIndex.value];
+  if (activeItem) {
+    activeItem.item_name = template.item_name;
+    activeItem.description = template.description;
+    activeItem.unit_price = Number(template.default_unit_price);
+  }
+
   showTemplatesModal.value = false;
 };
 
@@ -283,19 +290,19 @@ onMounted(() => {
                   <div class="form-row">
                     <div class="form-group">
                       <label>Item Name *</label>
-                      <input v-model="item.item_name" type="text" required placeholder="e.g. Spanish Tutoring" />
+                      <input v-model="item.item_name" type="text" required placeholder="e.g. Spanish Tutoring" @focus="setActiveItem(index)" />
                     </div>
                     <div class="form-group">
                       <label>Unit Price</label>
                       <div class="input-with-icon">
                         <span class="currency-symbol">{{ form.currency }}</span>
-                        <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required placeholder="0.00" />
+                        <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required placeholder="0.00" @focus="setActiveItem(index)" />
                       </div>
                     </div>
                   </div>
                   <div class="form-group">
                     <label>Description</label>
-                    <textarea v-model="item.description" required rows="2" placeholder="Detailed description of the item..."></textarea>
+                    <textarea v-model="item.description" required rows="2" placeholder="Detailed description of the item..." @focus="setActiveItem(index)"></textarea>
                   </div>
                   <div class="form-row">
                     <div class="form-group">

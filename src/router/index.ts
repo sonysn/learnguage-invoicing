@@ -3,6 +3,7 @@ import InvoiceList from '../views/InvoiceList.vue';
 import InvoiceForm from '../views/InvoiceForm.vue';
 import Login from '../views/Login.vue';
 import ServiceTemplates from '../views/ServiceTemplates.vue';
+import SentInvoicesLog from '../views/SentInvoicesLog.vue';
 
 const routes = [
   {
@@ -33,6 +34,12 @@ const routes = [
     path: '/service-templates',
     name: 'ServiceTemplates',
     component: ServiceTemplates,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/sent-invoices',
+    name: 'SentInvoicesLog',
+    component: SentInvoicesLog,
     meta: { requiresAuth: true }
   },
 ];

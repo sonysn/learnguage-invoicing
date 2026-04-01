@@ -10,10 +10,11 @@ interface Invoice {
   total_amount: number;
   currency: string;
   status: string;
+  sent_at: string | null;
+  due_date: string | null;
   created_at: string;
   is_recurring: boolean;
   recurrence_interval: string;
-  next_invoice_date: string | null;
   items: Array<{ description: string }>;
 }
 
@@ -25,55 +26,25 @@ const searchQuery = ref('');
 const fetchInvoices = async () => {
   try {
     loading.value = true;
-    const response = await api.get('/invoices/');
+    const response = await api.get('/invoices/?status=sent');
     invoices.value = response.data;
     error.value = null;
   } catch (err: any) {
-    error.value = 'Failed to load invoices. Please check your connection.';
+    error.value = 'Failed to load sent invoices. Please check your connection.';
     console.error(err);
   } finally {
     loading.value = false;
   }
 };
 
-const markAsSent = async (id: number) => {
-  if (!confirm('Are you sure you want to mark this invoice as sent? This will send the PDF invoice to the student.')) return;
-
-  try {
-    await api.post(`/invoices/${id}/mark_as_sent/`);
-    await fetchInvoices();
-  } catch (err: any) {
-    alert('Error: ' + (err.response?.data?.detail || err.message));
-  }
-};
-
 const resendInvoice = async (id: number) => {
+  if (!confirm('Are you sure you want to resend this invoice? The PDF will be sent again to the recipient.')) return;
+
   try {
     await api.post(`/invoices/${id}/resend_invoice/`);
     alert('Invoice resent successfully!');
   } catch (err: any) {
     alert('Error: ' + (err.response?.data?.detail || err.message));
-  }
-};
-
-const deleteInvoice = async (id: number, number: string, status: string, recipientEmail: string, isRecurring: boolean) => {
-  let message = `Are you sure you want to delete invoice ${number}? This action cannot be undone.\n\n`;
-  
-  if (status === 'sent') {
-    message = `⚠️ WARNING: This invoice has been sent to ${recipientEmail}.\n\n`;
-    message += `Deleting invoice ${number} cannot be undone.\n\n`;
-    if (isRecurring) {
-      message += '⚠️ This will also STOP future recurring invoices for this student.';
-    }
-  }
-
-  if (!confirm(message)) return;
-
-  try {
-    await api.delete(`/invoices/${id}/`);
-    await fetchInvoices();
-  } catch (err: any) {
-    alert('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
   }
 };
 
@@ -95,9 +66,12 @@ const downloadPdf = async (id: number, number: string) => {
   }
 };
 
-onMounted(fetchInvoices);
+onMounted(() => {
+  fetchInvoices();
+});
 
-const formatDate = (dateString: string) => {
+const formatDate = (dateString: string | null) => {
+  if (!dateString) return '—';
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -105,41 +79,15 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const getStatusClass = (status: string) => {
-  switch (status) {
-    case 'sent': return 'status-sent';
-    case 'pending': return 'status-pending';
-    case 'cancelled': return 'status-cancelled';
-    default: return 'status-draft';
-  }
-};
-
-const getDescriptionSummary = (invoice: Invoice) => {
-  if (!invoice.items || invoice.items.length === 0) return 'No items';
-  if (invoice.items.length === 1) return invoice.items[0].description;
-  return `${invoice.items[0].description} (+${invoice.items.length - 1} more)`;
-};
-
-const getRecurringLabel = (invoice: Invoice) => {
-  if (!invoice.is_recurring) return null;
-  const interval = invoice.recurrence_interval || 'none';
-  if (interval === 'none') return null;
-  
-  let label = interval.charAt(0).toUpperCase() + interval.slice(1);
-  if (invoice.next_invoice_date) {
-    const nextDate = new Date(invoice.next_invoice_date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric'
-    });
-    label += ` • Next: ${nextDate}`;
-  }
-  return label;
-};
-
-const getRecurringClass = (invoice: Invoice) => {
-  if (!invoice.is_recurring) return '';
-  const interval = invoice.recurrence_interval;
-  return `recurring-${interval}`;
+const formatDateTime = (dateString: string | null) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 const filteredInvoices = computed(() => {
@@ -153,29 +101,49 @@ const filteredInvoices = computed(() => {
     return nameMatch || emailMatch || invoiceNumberMatch;
   });
 });
+
+const totalSentAmount = computed(() => {
+  return filteredInvoices.value.reduce((sum, invoice) => sum + Number(invoice.total_amount), 0);
+});
+
+const getRecurringLabel = (invoice: Invoice) => {
+  if (!invoice.is_recurring) return null;
+  const interval = invoice.recurrence_interval || 'none';
+  if (interval === 'none') return null;
+  return interval.charAt(0).toUpperCase() + interval.slice(1);
+};
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="sent-invoices-log">
     <div class="page-header">
       <div>
-        <h1>Invoices</h1>
-        <p class="subtitle">Manage and track your student invoices</p>
+        <h1>Sent Invoices Log</h1>
+        <p class="subtitle">Track all invoices that have been sent to recipients</p>
       </div>
       <div class="header-actions">
-        <router-link to="/sent-invoices" class="btn-secondary">
-          📧 Sent Log
-        </router-link>
         <button @click="fetchInvoices" class="btn-secondary" :disabled="loading">
           {{ loading ? 'Updating...' : 'Refresh' }}
         </button>
-        <router-link to="/new" class="btn-primary">Create Invoice</router-link>
+        <router-link to="/" class="btn-primary">← Back to Invoices</router-link>
+      </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Sent Invoices</div>
+        <div class="stat-value">{{ filteredInvoices.length }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Amount Sent</div>
+        <div class="stat-value amount">{{ filteredInvoices.length > 0 ? filteredInvoices[0].currency : '' }} {{ totalSentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</div>
       </div>
     </div>
 
     <div v-if="loading && invoices.length === 0" class="loading-state">
       <div class="spinner"></div>
-      <p>Fetching invoices...</p>
+      <p>Loading sent invoices...</p>
     </div>
 
     <div v-else-if="error" class="error-container">
@@ -207,20 +175,20 @@ const filteredInvoices = computed(() => {
           </button>
         </div>
         <div class="results-count">
-          {{ filteredInvoices.length }} of {{ invoices.length }} invoices
+          {{ filteredInvoices.length }} invoice(s)
         </div>
       </div>
       <div class="table-wrapper">
         <table v-if="filteredInvoices.length > 0">
           <thead>
             <tr>
-              <th>Invoice</th>
+              <th>Invoice #</th>
               <th>Recipient</th>
-              <th>Description</th>
+              <th>Email</th>
               <th>Amount</th>
-              <th>Status</th>
+              <th>Sent Date</th>
+              <th>Due Date</th>
               <th>Recurring</th>
-              <th>Date</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
@@ -230,51 +198,38 @@ const filteredInvoices = computed(() => {
                 <span class="invoice-id">{{ invoice.invoice_number }}</span>
               </td>
               <td>
-                <div class="recipient-info">
-                  <span class="name">{{ invoice.recipient_name }}</span>
-                  <span class="email">{{ invoice.recipient_email }}</span>
-                </div>
+                <span class="name">{{ invoice.recipient_name }}</span>
               </td>
-              <td class="description-cell">
-                {{ getDescriptionSummary(invoice) }}
+              <td>
+                <span class="email">{{ invoice.recipient_email }}</span>
               </td>
               <td>
                 <span class="amount-text">
                   {{ invoice.currency }} {{ parseFloat(invoice.total_amount.toString()).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
                 </span>
               </td>
-              <td>
-                <span :class="['status-pill', getStatusClass(invoice.status)]">
-                  {{ invoice.status }}
+              <td class="date-cell">
+                <div class="sent-date">{{ formatDateTime(invoice.sent_at) }}</div>
+              </td>
+              <td class="date-cell">
+                <span :class="['due-date', { overdue: invoice.due_date && new Date(invoice.due_date) < new Date() }]">
+                  {{ formatDate(invoice.due_date) }}
                 </span>
               </td>
               <td>
-                <span v-if="getRecurringLabel(invoice)" :class="['recurring-pill', getRecurringClass(invoice)]">
+                <span v-if="getRecurringLabel(invoice)" class="recurring-pill">
                   {{ getRecurringLabel(invoice) }}
                 </span>
                 <span v-else class="no-recurring">—</span>
               </td>
-              <td class="date-cell">{{ formatDate(invoice.created_at) }}</td>
               <td class="actions-cell">
                 <button
-                  v-if="invoice.status === 'pending'"
-                  @click="markAsSent(invoice.id)"
-                  class="action-btn confirm"
-                  title="Mark as Sent"
-                >
-                  Mark as Sent
-                </button>
-                <button
-                  v-if="invoice.status === 'sent'"
                   @click="resendInvoice(invoice.id)"
                   class="action-btn resend"
                   title="Resend Invoice"
                 >
                   Resend
                 </button>
-                <router-link :to="'/edit/' + invoice.id" class="action-btn edit" title="Edit">
-                  Edit
-                </router-link>
                 <button
                   @click="downloadPdf(invoice.id, invoice.invoice_number)"
                   class="action-btn view-pdf"
@@ -282,24 +237,17 @@ const filteredInvoices = computed(() => {
                 >
                   View PDF
                 </button>
-                <button
-                  @click="deleteInvoice(invoice.id, invoice.invoice_number, invoice.status, invoice.recipient_email, invoice.is_recurring)"
-                  class="action-btn delete"
-                  title="Delete"
-                >
-                  Delete
-                </button>
               </td>
             </tr>
           </tbody>
         </table>
 
         <div v-else class="empty-state">
-          <div class="empty-illustration">🔍</div>
-          <h3>No matching invoices found</h3>
+          <div class="empty-illustration">📧</div>
+          <h3>No sent invoices found</h3>
           <p v-if="searchQuery">No invoices match your search: "<strong>{{ searchQuery }}</strong>"</p>
-          <p v-else>No invoices yet. Create your first invoice to start tracking payments.</p>
-          <router-link v-if="!searchQuery" to="/new" class="btn-primary">Create First Invoice</router-link>
+          <p v-else>There are no sent invoices yet. Mark an invoice as sent from the dashboard.</p>
+          <router-link v-if="!searchQuery" to="/" class="btn-primary">Go to Dashboard</router-link>
           <button v-else @click="searchQuery = ''" class="btn-secondary">Clear Search</button>
         </div>
       </div>
@@ -331,6 +279,41 @@ h1 {
 .header-actions {
   display: flex;
   gap: 0.75rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stat-value.amount {
+  color: #2563eb;
 }
 
 /* Card Styling */
@@ -466,11 +449,6 @@ tr:hover td {
   font-size: 0.875rem;
 }
 
-.recipient-info {
-  display: flex;
-  flex-direction: column;
-}
-
 .name {
   font-weight: 600;
   color: #0f172a;
@@ -480,15 +458,6 @@ tr:hover td {
 .email {
   font-size: 0.8125rem;
   color: #64748b;
-}
-
-.description-cell {
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #475569;
-  font-size: 0.875rem;
 }
 
 .amount-text {
@@ -501,34 +470,18 @@ tr:hover td {
   font-size: 0.875rem;
 }
 
-/* Status Pills */
-.status-pill {
-  display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: capitalize;
+.sent-date {
+  font-weight: 500;
+  color: #0f172a;
 }
 
-.status-sent {
-  background: #dbeafe;
-  color: #1e40af;
+.due-date {
+  color: #64748b;
 }
 
-.status-pending {
-  background: #fef9c3;
-  color: #a16207;
-}
-
-.status-cancelled {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.status-draft {
-  background: #f1f5f9;
-  color: #475569;
+.due-date.overdue {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 /* Recurring Pills */
@@ -541,11 +494,6 @@ tr:hover td {
   background: #dbeafe;
   color: #1e40af;
 }
-
-.recurring-weekly { background: #dcfce7; color: #166534; }
-.recurring-monthly { background: #fef9c3; color: #854d0e; }
-.recurring-quarterly { background: #fed7aa; color: #9a3412; }
-.recurring-yearly { background: #e0e7ff; color: #3730a3; }
 
 .no-recurring {
   color: #cbd5e1;
@@ -570,15 +518,6 @@ tr:hover td {
   transition: all 0.2s;
 }
 
-.action-btn.confirm {
-  background: #2563eb;
-  color: white;
-}
-
-.action-btn.confirm:hover {
-  background: #1d4ed8;
-}
-
 .action-btn.resend {
   border-color: #e2e8f0;
   color: #475569;
@@ -589,15 +528,6 @@ tr:hover td {
   border-color: #cbd5e1;
 }
 
-.action-btn.edit {
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.action-btn.edit:hover {
-  background: #eff6ff;
-}
-
 .action-btn.view-pdf {
   color: #64748b;
   border-color: #e2e8f0;
@@ -606,14 +536,6 @@ tr:hover td {
 .action-btn.view-pdf:hover {
   background: #f8fafc;
   color: #0f172a;
-}
-
-.action-btn.delete {
-  color: #ef4444;
-}
-
-.action-btn.delete:hover {
-  background: #fef2f2;
 }
 
 /* Empty State */
@@ -644,6 +566,10 @@ tr:hover td {
     background: #1e293b;
     border-color: #334155;
   }
+  .stat-card {
+    background: #1e293b;
+    border-color: #334155;
+  }
   .table-header {
     background: #1a2233;
     border-color: #334155;
@@ -659,7 +585,7 @@ tr:hover td {
     background: #334155;
     color: #f1f5f9;
   }
-  .name, .amount-text { color: #f8fafc; }
+  .name, .amount-text, .sent-date { color: #f8fafc; }
   tr:hover td { background-color: #1a2233; }
   .action-btn.resend { border-color: #334155; color: #94a3b8; }
   .action-btn.resend:hover { background: #334155; }

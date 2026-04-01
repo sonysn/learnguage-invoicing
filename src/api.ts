@@ -34,7 +34,7 @@ export default api;
 // Service Templates API
 export const serviceTemplatesApi = {
   getAll: () => api.get('/service-templates/'),
-  create: (data: { description: string; default_unit_price: number }) => api.post('/service-templates/', data),
-  update: (id: number, data: { description: string; default_unit_price: number }) => api.put(`/service-templates/${id}/`, data),
+  create: (data: { item_name: string; description: string; default_unit_price: number; currency: string }) => api.post('/service-templates/', data),
+  update: (id: number, data: { item_name: string; description: string; default_unit_price: number; currency: string }) => api.put(`/service-templates/${id}/`, data),
   delete: (id: number) => api.delete(`/service-templates/${id}/`),
 };
