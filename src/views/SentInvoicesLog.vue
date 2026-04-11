@@ -92,7 +92,7 @@ const formatDateTime = (dateString: string | null) => {
 
 const filteredInvoices = computed(() => {
   if (!searchQuery.value.trim()) return invoices.value;
-  
+
   const query = searchQuery.value.toLowerCase().trim();
   return invoices.value.filter(invoice => {
     const nameMatch = invoice.recipient_name.toLowerCase().includes(query);
@@ -102,8 +102,18 @@ const filteredInvoices = computed(() => {
   });
 });
 
-const totalSentAmount = computed(() => {
-  return filteredInvoices.value.reduce((sum, invoice) => sum + Number(invoice.total_amount), 0);
+const totalsByCurrency = computed(() => {
+  const totals: Record<string, number> = {};
+  
+  filteredInvoices.value.forEach(invoice => {
+    const currency = invoice.currency || 'Unknown';
+    if (!totals[currency]) {
+      totals[currency] = 0;
+    }
+    totals[currency] += Number(invoice.total_amount);
+  });
+  
+  return totals;
 });
 
 const getRecurringLabel = (invoice: Invoice) => {
@@ -135,9 +145,16 @@ const getRecurringLabel = (invoice: Invoice) => {
         <div class="stat-label">Total Sent Invoices</div>
         <div class="stat-value">{{ filteredInvoices.length }}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Amount Sent</div>
-        <div class="stat-value amount">{{ filteredInvoices.length > 0 ? filteredInvoices[0].currency : '' }} {{ totalSentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</div>
+    </div>
+
+    <!-- Totals by Currency -->
+    <div v-if="Object.keys(totalsByCurrency).length > 0" class="currency-totals">
+      <h3 class="section-label">Total Amount by Currency</h3>
+      <div class="currency-grid">
+        <div v-for="(amount, currency) in totalsByCurrency" :key="currency" class="currency-card">
+          <div class="currency-code">{{ currency }}</div>
+          <div class="currency-amount">{{ amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</div>
+        </div>
       </div>
     </div>
 
@@ -313,6 +330,49 @@ h1 {
 }
 
 .stat-value.amount {
+  color: #2563eb;
+}
+
+/* Currency Totals */
+.currency-totals {
+  margin-bottom: 2rem;
+}
+
+.section-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.currency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.currency-card {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.currency-code {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.currency-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
   color: #2563eb;
 }
 
@@ -567,6 +627,10 @@ tr:hover td {
     border-color: #334155;
   }
   .stat-card {
+    background: #1e293b;
+    border-color: #334155;
+  }
+  .currency-card {
     background: #1e293b;
     border-color: #334155;
   }
