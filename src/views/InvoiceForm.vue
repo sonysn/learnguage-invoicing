@@ -302,7 +302,7 @@ onMounted(() => {
                   </div>
                   <div class="form-group">
                     <label>Description</label>
-                    <textarea v-model="item.description" required rows="2" placeholder="Detailed description of the item..." @focus="setActiveItem(index)"></textarea>
+                    <textarea v-model="item.description" rows="2" placeholder="Detailed description of the item..." @focus="setActiveItem(index)"></textarea>
                   </div>
                   <div class="form-row">
                     <div class="form-group">
