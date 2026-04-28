@@ -2,31 +2,29 @@
 import { ref, onMounted, computed } from 'vue';
 import api from '../api';
 
-interface Invoice {
+interface SentInvoice {
   id: number;
   invoice_number: string;
   recipient_name: string;
   recipient_email: string;
   total_amount: number;
   currency: string;
-  status: string;
-  sent_at: string | null;
+  sent_at: string;
   due_date: string | null;
   created_at: string;
-  is_recurring: boolean;
-  recurrence_interval: string;
   items: Array<{ description: string }>;
 }
 
-const invoices = ref<Invoice[]>([]);
+const invoices = ref<SentInvoice[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
+const deletingId = ref<number | null>(null);
 
 const fetchInvoices = async () => {
   try {
     loading.value = true;
-    const response = await api.get('/invoices/?status=sent');
+    const response = await api.get('/sent-invoices/');
     invoices.value = response.data;
     error.value = null;
   } catch (err: any) {
@@ -37,20 +35,26 @@ const fetchInvoices = async () => {
   }
 };
 
-const resendInvoice = async (id: number) => {
-  if (!confirm('Are you sure you want to resend this invoice? The PDF will be sent again to the recipient.')) return;
+const deleteSentInvoice = async (id: number, invoiceNumber: string) => {
+  if (!confirm(`Are you sure you want to delete the sent invoice record for ${invoiceNumber}? This action cannot be undone.`)) {
+    return;
+  }
 
   try {
-    await api.post(`/invoices/${id}/resend_invoice/`);
-    alert('Invoice resent successfully!');
+    deletingId.value = id;
+    await api.delete(`/sent-invoices/${id}/`);
+    invoices.value = invoices.value.filter(inv => inv.id !== id);
+    alert(`Sent invoice ${invoiceNumber} has been deleted.`);
   } catch (err: any) {
     alert('Error: ' + (err.response?.data?.detail || err.message));
+  } finally {
+    deletingId.value = null;
   }
 };
 
 const downloadPdf = async (id: number, number: string) => {
   try {
-    const response = await api.get(`/invoices/${id}/download_pdf/`, {
+    const response = await api.get(`/sent-invoices/${id}/download_pdf/`, {
       responseType: 'blob'
     });
     const url = window.URL.createObjectURL(response.data);
@@ -115,13 +119,7 @@ const totalsByCurrency = computed(() => {
   
   return totals;
 });
-
-const getRecurringLabel = (invoice: Invoice) => {
-  if (!invoice.is_recurring) return null;
-  const interval = invoice.recurrence_interval || 'none';
-  if (interval === 'none') return null;
-  return interval.charAt(0).toUpperCase() + interval.slice(1);
-};
+</script>
 </script>
 
 <template>
@@ -129,7 +127,7 @@ const getRecurringLabel = (invoice: Invoice) => {
     <div class="page-header">
       <div>
         <h1>Sent Invoices Log</h1>
-        <p class="subtitle">Track all invoices that have been sent to recipients</p>
+        <p class="subtitle">Immutable record of all invoices sent to recipients. These are fixed snapshots and cannot be edited.</p>
       </div>
       <div class="header-actions">
         <button @click="fetchInvoices" class="btn-secondary" :disabled="loading">
@@ -203,9 +201,8 @@ const getRecurringLabel = (invoice: Invoice) => {
               <th>Recipient</th>
               <th>Email</th>
               <th>Amount</th>
-              <th>Sent Date</th>
+              <th>Sent Date/Time</th>
               <th>Due Date</th>
-              <th>Recurring</th>
               <th class="text-right">Actions</th>
             </tr>
           </thead>
@@ -233,26 +230,21 @@ const getRecurringLabel = (invoice: Invoice) => {
                   {{ formatDate(invoice.due_date) }}
                 </span>
               </td>
-              <td>
-                <span v-if="getRecurringLabel(invoice)" class="recurring-pill">
-                  {{ getRecurringLabel(invoice) }}
-                </span>
-                <span v-else class="no-recurring">—</span>
-              </td>
               <td class="actions-cell">
-                <button
-                  @click="resendInvoice(invoice.id)"
-                  class="action-btn resend"
-                  title="Resend Invoice"
-                >
-                  Resend
-                </button>
                 <button
                   @click="downloadPdf(invoice.id, invoice.invoice_number)"
                   class="action-btn view-pdf"
-                  title="View PDF"
+                  title="Download the exact PDF that was sent"
                 >
-                  View PDF
+                  Download PDF
+                </button>
+                <button
+                  @click="deleteSentInvoice(invoice.id, invoice.invoice_number)"
+                  :disabled="deletingId === invoice.id"
+                  class="action-btn delete"
+                  title="Delete this sent invoice record"
+                >
+                  {{ deletingId === invoice.id ? 'Deleting...' : 'Delete' }}
                 </button>
               </td>
             </tr>
@@ -596,6 +588,21 @@ tr:hover td {
 .action-btn.view-pdf:hover {
   background: #f8fafc;
   color: #0f172a;
+}
+
+.action-btn.delete {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.action-btn.delete:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Empty State */
