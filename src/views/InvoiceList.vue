@@ -720,6 +720,35 @@ tr:hover td {
   }
 }
 
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.625rem;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions > * {
+    width: 100%;
+    text-align: center;
+  }
+
+  .table-header {
+    padding: 1rem;
+  }
+
+  .search-box {
+    min-width: 0;
+  }
+
+  th,
+  td {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 /* Dark Mode Overrides */
 @media (prefers-color-scheme: dark) {
   .card {

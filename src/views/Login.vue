@@ -75,6 +75,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 60vh;
+  padding: 1rem 0;
 }
 
 .login-card {
@@ -124,4 +125,11 @@ input {
 .btn-primary:hover { background-color: #1d4ed8; }
 .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
 .w-full { width: 100%; }
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 1.5rem;
+    border-radius: 0.875rem;
+  }
+}
 </style>

@@ -143,20 +143,22 @@ const formatPrice = (price: number) => {
                 {{ template.description || '---' }}
               </td>
               <td class="actions-cell">
-                <button
-                  @click="openEditModal(template)"
-                  class="action-btn edit"
-                  title="Edit"
-                >
-                  Edit
-                </button>
-                <button
-                  @click="deleteTemplate(template.id, template.item_name)"
-                  class="action-btn delete"
-                  title="Delete"
-                >
-                  Delete
-                </button>
+                <div class="actions-group">
+                  <button
+                    @click="openEditModal(template)"
+                    class="action-btn edit"
+                    title="Edit"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    @click="deleteTemplate(template.id, template.item_name)"
+                    class="action-btn delete"
+                    title="Delete"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -238,9 +240,9 @@ h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem; }
 .header-actions { display: flex; gap: 0.75rem; }
 
 .card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
-.table-wrapper { overflow-x: auto; }
+.table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
 th { background: #f8fafc; padding: 1rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #e2e8f0; }
 td { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
@@ -249,7 +251,8 @@ tr:hover td { background-color: #f8fafc; }
 .description-text { font-weight: 500; color: #0f172a; }
 .price-text { font-weight: 700; color: #2563eb; font-size: 1rem; }
 
-.actions-cell { display: flex; justify-content: flex-end; gap: 0.5rem; }
+.actions-cell { text-align: right; }
+.actions-group { display: inline-flex; justify-content: flex-end; gap: 0.5rem; white-space: nowrap; }
 .action-btn { padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 600; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.2s; }
 .action-btn.edit { color: #2563eb; }
 .action-btn.edit:hover { background: #eff6ff; }
@@ -281,6 +284,41 @@ textarea:focus, input:focus { outline: none; border-color: #2563eb; box-shadow: 
 .form-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #f1f5f9; }
 
 .text-right { text-align: right; }
+
+@media (max-width: 768px) {
+  .page-header,
+  .form-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .header-actions > * {
+    width: 100%;
+  }
+
+  .modal-content {
+    width: calc(100% - 1rem);
+    padding: 1.25rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.625rem;
+  }
+}
 
 /* Dark Mode */
 @media (prefers-color-scheme: dark) {

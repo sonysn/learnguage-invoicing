@@ -604,6 +604,89 @@ hr { border: 0; border-top: 1px solid #e2e8f0; margin: 1.5rem 0; }
 .template-price { font-weight: 700; color: #2563eb; font-size: 0.9375rem; }
 .template-description { font-size: 0.8125rem; color: #64748b; margin: 0.25rem 0 0 0; }
 
-@media (max-width: 1024px) { .form-grid { grid-template-columns: 1fr; } .preview-card { position: static; } }
+@media (max-width: 1024px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .preview-card { position: static; }
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .section-header,
+  .tax-toggle,
+  .recurring-toggle,
+  .form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header,
+  .section-header {
+    gap: 1rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .card {
+    padding: 1.25rem;
+  }
+
+  .card-sub {
+    padding: 1.25rem 1rem 1rem;
+  }
+
+  .form-row,
+  .form-row-dates,
+  .radio-group {
+    grid-template-columns: 1fr;
+  }
+
+  .item-row {
+    display: block;
+  }
+
+  .item-main {
+    width: 100%;
+  }
+
+  .btn-remove {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .toggle-info {
+    margin-bottom: 0.75rem;
+  }
+
+  .form-footer .btn-primary,
+  .form-footer .btn-secondary {
+    width: 100%;
+  }
+
+  .modal-content {
+    width: calc(100% - 1rem);
+    padding: 1.25rem;
+    max-height: 88vh;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.625rem;
+  }
+
+  .btn-text-primary,
+  .btn-text-secondary {
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0;
+  }
+
+  .preview-item .value.big {
+    font-size: 1.25rem;
+  }
+}
+
 @media (prefers-color-scheme: dark) { .card { background: #1e293b; border-color: #334155; } .preview-card { background: #1a2233; } h3, .preview-item .value { color: #f8fafc; } input, textarea, select { background: #0f172a; border-color: #334155; color: #f1f5f9; } .card-sub, .recurring-toggle, .preview-note, .tax-toggle, .tax-options { background: #0f172a; border-color: #334155; } .radio-card { border-color: #334155; } .modal-content { background: #1e293b; } .template-item { border-color: #334155; } .template-item:hover { background: #0f172a; } }
 </style>

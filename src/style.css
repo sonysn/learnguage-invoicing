@@ -28,6 +28,10 @@ body {
   box-sizing: border-box;
 }
 
+img {
+  max-width: 100%;
+}
+
 a {
   font-weight: 500;
   color: #2563eb;
@@ -86,6 +90,17 @@ button {
 .btn-secondary:hover {
   background: #f8fafc;
   border-color: #cbd5e1;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

@@ -56,7 +56,7 @@ const logout = () => {
 .top-nav {
   background: white;
   border-bottom: 1px solid #e2e8f0;
-  height: 72px;
+  min-height: 72px;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -66,7 +66,10 @@ const logout = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 100%;
+  min-height: 72px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  gap: 1rem;
 }
 
 .brand a {
@@ -92,6 +95,8 @@ const logout = () => {
   display: flex;
   align-items: center;
   gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .nav-item {
@@ -141,6 +146,72 @@ const logout = () => {
   padding: 3rem 0;
 }
 
+@media (max-width: 860px) {
+  .top-nav {
+    position: static;
+  }
+
+  .nav-content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nav-links {
+    width: 100%;
+    gap: 0.75rem;
+    justify-content: flex-start;
+  }
+
+  .btn-create {
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand a {
+    gap: 0.75rem;
+  }
+
+  .nav-logo {
+    height: 28px;
+  }
+
+  .brand-text {
+    font-size: 1rem;
+  }
+
+  .nav-links {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nav-item,
+  .btn-create,
+  .btn-logout {
+    width: 100%;
+  }
+
+  .nav-item {
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+  }
+
+  .btn-create {
+    text-align: center;
+  }
+
+  .btn-logout {
+    padding: 0.75rem 0.9rem;
+    text-align: left;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    color: #475569;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .top-nav {
     background: #1e293b;
@@ -154,6 +225,14 @@ const logout = () => {
   }
   .nav-item:hover {
     color: #60a5fa;
+  }
+}
+
+@media (prefers-color-scheme: dark) and (max-width: 560px) {
+  .nav-item,
+  .btn-logout {
+    background: #1e293b;
+    border-color: #334155;
   }
 }
 </style>

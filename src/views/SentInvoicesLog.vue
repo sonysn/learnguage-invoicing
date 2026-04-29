@@ -230,21 +230,23 @@ const totalsByCurrency = computed(() => {
                 </span>
               </td>
               <td class="actions-cell">
-                <button
-                  @click="downloadPdf(invoice.id, invoice.invoice_number)"
-                  class="action-btn view-pdf"
-                  title="Download the exact PDF that was sent"
-                >
-                  Download PDF
-                </button>
-                <button
-                  @click="deleteSentInvoice(invoice.id, invoice.invoice_number)"
-                  :disabled="deletingId === invoice.id"
-                  class="action-btn delete"
-                  title="Delete this sent invoice record"
-                >
-                  {{ deletingId === invoice.id ? 'Deleting...' : 'Delete' }}
-                </button>
+                <div class="actions-group">
+                  <button
+                    @click="downloadPdf(invoice.id, invoice.invoice_number)"
+                    class="action-btn view-pdf"
+                    title="Download the exact PDF that was sent"
+                  >
+                    Download PDF
+                  </button>
+                  <button
+                    @click="deleteSentInvoice(invoice.id, invoice.invoice_number)"
+                    :disabled="deletingId === invoice.id"
+                    class="action-btn delete"
+                    title="Delete this sent invoice record"
+                  >
+                    {{ deletingId === invoice.id ? 'Deleting...' : 'Delete' }}
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -456,11 +458,13 @@ h1 {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 980px;
 }
 
 th {
@@ -553,9 +557,14 @@ tr:hover td {
 
 /* Actions */
 .actions-cell {
-  display: flex;
+  text-align: right;
+}
+
+.actions-group {
+  display: inline-flex;
   justify-content: flex-end;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .action-btn {
@@ -625,6 +634,55 @@ tr:hover td {
 }
 
 .text-right { text-align: right; }
+
+@media (max-width: 960px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .table-header {
+    align-items: stretch;
+  }
+
+  .search-box {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.625rem;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions > * {
+    width: 100%;
+    text-align: center;
+  }
+
+  .table-header {
+    padding: 1rem;
+  }
+
+  .search-box {
+    min-width: 0;
+  }
+
+  .stats-grid,
+  .currency-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* Dark Mode Overrides */
 @media (prefers-color-scheme: dark) {
