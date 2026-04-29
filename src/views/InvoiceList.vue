@@ -440,18 +440,17 @@ h1 {
 table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
-  min-width: 1180px;
+  min-width: 1320px;
 }
 
-col.col-invoice { width: 134px; }
-col.col-recipient { width: 22%; }
-col.col-description { width: 20%; }
-col.col-amount { width: 12%; }
-col.col-status { width: 10%; }
-col.col-recurring { width: 14%; }
-col.col-date { width: 10%; }
-col.col-actions { width: 240px; }
+col.col-invoice { width: 160px; }
+col.col-recipient { width: 260px; }
+col.col-description { width: 280px; }
+col.col-amount { width: 180px; }
+col.col-status { width: 140px; }
+col.col-recurring { width: 220px; }
+col.col-date { width: 150px; }
+col.col-actions { width: 280px; }
 
 thead th:first-child {
   padding-left: 1.75rem;
@@ -477,7 +476,6 @@ td {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
-  overflow: hidden;
 }
 
 tr:last-child td {
@@ -610,8 +608,8 @@ tr:hover td {
 .actions-group {
   display: flex;
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .action-btn {
