@@ -212,6 +212,16 @@ const filteredInvoices = computed(() => {
       </div>
       <div class="table-wrapper">
         <table v-if="filteredInvoices.length > 0">
+          <colgroup>
+            <col class="col-invoice" />
+            <col class="col-recipient" />
+            <col class="col-description" />
+            <col class="col-amount" />
+            <col class="col-status" />
+            <col class="col-recurring" />
+            <col class="col-date" />
+            <col class="col-actions" />
+          </colgroup>
           <thead>
             <tr>
               <th>Invoice</th>
@@ -256,39 +266,41 @@ const filteredInvoices = computed(() => {
               </td>
               <td class="date-cell">{{ formatDate(invoice.created_at) }}</td>
               <td class="actions-cell">
-                <button
-                  v-if="invoice.status === 'pending'"
-                  @click="markAsSent(invoice.id)"
-                  class="action-btn confirm"
-                  title="Mark as Sent"
-                >
-                  Mark as Sent
-                </button>
-                <button
-                  v-if="invoice.status === 'sent'"
-                  @click="resendInvoice(invoice.id)"
-                  class="action-btn resend"
-                  title="Resend Invoice"
-                >
-                  Resend
-                </button>
-                <router-link :to="'/edit/' + invoice.id" class="action-btn edit" title="Edit">
-                  Edit
-                </router-link>
-                <button
-                  @click="downloadPdf(invoice.id, invoice.invoice_number)"
-                  class="action-btn view-pdf"
-                  title="View PDF"
-                >
-                  View PDF
-                </button>
-                <button
-                  @click="deleteInvoice(invoice.id, invoice.invoice_number, invoice.status, invoice.recipient_email, invoice.is_recurring)"
-                  class="action-btn delete"
-                  title="Delete"
-                >
-                  Delete
-                </button>
+                <div class="actions-group">
+                  <button
+                    v-if="invoice.status === 'pending'"
+                    @click="markAsSent(invoice.id)"
+                    class="action-btn confirm"
+                    title="Mark as Sent"
+                  >
+                    Mark as Sent
+                  </button>
+                  <button
+                    v-if="invoice.status === 'sent'"
+                    @click="resendInvoice(invoice.id)"
+                    class="action-btn resend"
+                    title="Resend Invoice"
+                  >
+                    Resend
+                  </button>
+                  <router-link :to="'/edit/' + invoice.id" class="action-btn edit" title="Edit">
+                    Edit
+                  </router-link>
+                  <button
+                    @click="downloadPdf(invoice.id, invoice.invoice_number)"
+                    class="action-btn view-pdf"
+                    title="View PDF"
+                  >
+                    View PDF
+                  </button>
+                  <button
+                    @click="deleteInvoice(invoice.id, invoice.invoice_number, invoice.status, invoice.recipient_email, invoice.is_recurring)"
+                    class="action-btn delete"
+                    title="Delete"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -422,11 +434,31 @@ h1 {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 1180px;
+}
+
+col.col-invoice { width: 134px; }
+col.col-recipient { width: 22%; }
+col.col-description { width: 20%; }
+col.col-amount { width: 12%; }
+col.col-status { width: 10%; }
+col.col-recurring { width: 14%; }
+col.col-date { width: 10%; }
+col.col-actions { width: 240px; }
+
+thead th:first-child {
+  padding-left: 1.75rem;
+}
+
+tbody td:first-child {
+  padding-left: 1.75rem;
 }
 
 th {
@@ -445,6 +477,7 @@ td {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  overflow: hidden;
 }
 
 tr:last-child td {
@@ -457,33 +490,47 @@ tr:hover td {
 
 /* Cell Content */
 .invoice-id {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 600;
   color: #0f172a;
   background: #f1f5f9;
-  padding: 0.25rem 0.5rem;
+  padding: 0.375rem 0.625rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .recipient-info {
   display: flex;
   flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .name {
   font-weight: 600;
   color: #0f172a;
   font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .email {
+  display: block;
   font-size: 0.8125rem;
   color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .description-cell {
-  max-width: 200px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -492,13 +539,16 @@ tr:hover td {
 }
 
 .amount-text {
+  display: inline-block;
   font-weight: 700;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 .date-cell {
   color: #64748b;
   font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 /* Status Pills */
@@ -554,12 +604,20 @@ tr:hover td {
 
 /* Actions */
 .actions-cell {
+  text-align: right;
+}
+
+.actions-group {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.8125rem;
@@ -568,6 +626,7 @@ tr:hover td {
   background: transparent;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .action-btn.confirm {
@@ -638,6 +697,31 @@ tr:hover td {
 
 .text-right { text-align: right; }
 
+@media (max-width: 960px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .table-header {
+    align-items: stretch;
+  }
+
+  .search-box {
+    max-width: none;
+    width: 100%;
+  }
+
+  .results-count {
+    align-self: flex-start;
+  }
+}
+
 /* Dark Mode Overrides */
 @media (prefers-color-scheme: dark) {
   .card {
@@ -685,6 +769,14 @@ tr:hover td {
   }
   .results-count {
     color: #94a3b8;
+  }
+  .action-btn.view-pdf {
+    border-color: #475569;
+    color: #cbd5e1;
+  }
+  .action-btn.view-pdf:hover {
+    background: #334155;
+    color: #f8fafc;
   }
 }
 </style>

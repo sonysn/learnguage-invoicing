@@ -120,7 +120,6 @@ const totalsByCurrency = computed(() => {
   return totals;
 });
 </script>
-</script>
 
 <template>
   <div class="sent-invoices-log">
