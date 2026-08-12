@@ -14,7 +14,7 @@ interface Invoice {
   is_recurring: boolean;
   recurrence_interval: string;
   next_invoice_date: string | null;
-  items: Array<{ description: string }>;
+  items: Array<{ item_name?: string; description?: string; discount_percentage?: number }>;
 }
 
 const invoices = ref<Invoice[]>([]);
@@ -116,8 +116,10 @@ const getStatusClass = (status: string) => {
 
 const getDescriptionSummary = (invoice: Invoice) => {
   if (!invoice.items || invoice.items.length === 0) return 'No items';
-  if (invoice.items.length === 1) return invoice.items[0].description;
-  return `${invoice.items[0].description} (+${invoice.items.length - 1} more)`;
+  const first = invoice.items[0];
+  const summaryText = first.item_name || first.description || 'Item';
+  if (invoice.items.length === 1) return summaryText;
+  return `${summaryText} (+${invoice.items.length - 1} more)`;
 };
 
 const getRecurringLabel = (invoice: Invoice) => {

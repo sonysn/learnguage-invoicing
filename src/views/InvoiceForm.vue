@@ -48,6 +48,7 @@ const form = ref({
       duration_value: 1,
       duration_unit: "",
       unit_price: 0,
+      discount_percentage: 0,
     },
   ],
 });
@@ -59,24 +60,30 @@ const getFullTitle = computed(() => {
   return form.value.recipient_title;
 });
 
-const totalAmount = computed(() => {
-  const subtotal = form.value.items.reduce((sum, item) => {
-    return (
-      sum + (Number(item.duration_value) || 0) * (Number(item.unit_price) || 0)
-    );
-  }, 0);
+const getItemOriginalPrice = (item: { duration_value: number; unit_price: number }) => {
+  return (Number(item.duration_value) || 0) * (Number(item.unit_price) || 0);
+};
 
+const getItemDiscountAmount = (item: { duration_value: number; unit_price: number; discount_percentage: number }) => {
+  const orig = getItemOriginalPrice(item);
+  const pct = Number(item.discount_percentage) || 0;
+  return (orig * pct) / 100;
+};
+
+const getItemTotalPrice = (item: { duration_value: number; unit_price: number; discount_percentage: number }) => {
+  return getItemOriginalPrice(item) - getItemDiscountAmount(item);
+};
+
+const totalAmount = computed(() => {
   if (form.value.include_tax && form.value.tax_percentage > 0) {
-    return subtotal * (1 + form.value.tax_percentage / 100);
+    return subtotal.value * (1 + form.value.tax_percentage / 100);
   }
-  return subtotal;
+  return subtotal.value;
 });
 
 const subtotal = computed(() => {
   return form.value.items.reduce((sum, item) => {
-    return (
-      sum + (Number(item.duration_value) || 0) * (Number(item.unit_price) || 0)
-    );
+    return sum + getItemTotalPrice(item);
   }, 0);
 });
 
@@ -95,6 +102,7 @@ const addItem = () => {
     duration_value: 1,
     duration_unit: "",
     unit_price: 0,
+    discount_percentage: 0,
   });
 };
 
@@ -195,6 +203,7 @@ const fetchInvoice = async () => {
       duration_value: parseInt(item.duration_value) || 1,
       duration_unit: item.duration_unit || "",
       unit_price: parseFloat(item.unit_price) || 0,
+      discount_percentage: parseFloat(item.discount_percentage) || 0,
     }));
   } catch (err: any) {
     alert("Failed to load invoice details.");
@@ -229,6 +238,7 @@ const saveInvoice = async () => {
           duration_value: item.duration_value,
           duration_unit: item.duration_unit?.trim() || null,
           unit_price: item.unit_price,
+          discount_percentage: item.discount_percentage || 0,
         };
         if (item.id) {
           baseItem.id = item.id;
@@ -432,15 +442,34 @@ onMounted(() => {
                         placeholder="e.g. month, hour, session"
                       />
                     </div>
+                    <div class="form-group">
+                      <label>Discount (%)</label>
+                      <div class="input-with-icon">
+                        <input
+                          v-model.number="item.discount_percentage"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="0"
+                          @focus="setActiveItem(index)"
+                        />
+                        <span class="currency-symbol">%</span>
+                      </div>
+                    </div>
                   </div>
                   <div class="item-total">
-                    <span>Amount: </span>
+                    <template v-if="(item.discount_percentage || 0) > 0">
+                      <span class="discount-breakdown">
+                        Original Fee: {{ form.currency }} {{ getItemOriginalPrice(item).toLocaleString(undefined, { minimumFractionDigits: 2 }) }} |
+                        Discount: {{ item.discount_percentage }}% (-{{ form.currency }} {{ getItemDiscountAmount(item).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}) |
+                      </span>
+                    </template>
+                    <span>Final Fee: </span>
                     <strong
                       >{{ form.currency }}
                       {{
-                        (
-                          (item.duration_value || 0) * (item.unit_price || 0)
-                        ).toLocaleString(undefined, {
+                        getItemTotalPrice(item).toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                         })
                       }}</strong
