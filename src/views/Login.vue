@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../api';
+import { PLATFORM_TAG } from '../../constants/platform';
 
 const router = useRouter();
 const email = ref('');
@@ -16,7 +17,8 @@ const handleLogin = async () => {
     
     const response = await api.post('/login', {
       email: email.value,
-      password: password.value
+      password: password.value,
+      platform_tag: PLATFORM_TAG
     });
     
     // The backend seems to return tokens based on the LoginView
