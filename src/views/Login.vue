@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { Mail, Lock, AlertCircle, Loader2 } from 'lucide-vue-next';
 import api from '../api';
 import { PLATFORM_TAG } from '../../constants/platform';
 
@@ -14,26 +15,22 @@ const handleLogin = async () => {
   try {
     loading.value = true;
     error.value = '';
-    
+
     const response = await api.post('/login', {
       email: email.value,
       password: password.value,
       platform_tag: PLATFORM_TAG
     });
-    
-    // The backend seems to return tokens based on the LoginView
-    // If it's using SimpleJWT, it might be 'access' or just 'token'
-    // Looking at the LoginView, it uses RefreshToken.for_user(user)
-    
+
     const { access_token, refresh_token } = response.data;
-    
+
     if (access_token) {
       localStorage.setItem('access_token', access_token);
     }
     if (refresh_token) {
       localStorage.setItem('refresh_token', refresh_token);
     }
-    
+
     router.push('/');
   } catch (err: any) {
     error.value = err.response?.data?.message || 'Login failed. Please check your credentials.';
@@ -45,93 +42,48 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="login-view">
-    <div class="login-card">
-      <h2>Admin Login</h2>
-      <p>Please log in to manage invoices.</p>
-      
-      <form @submit.prevent="handleLogin">
-        <div v-if="error" class="error-msg">{{ error }}</div>
-        
-        <div class="form-group">
-          <label>Email</label>
-          <input v-model="email" type="email" required placeholder="admin@learnguage.online" />
+  <div class="flex justify-center items-center min-h-[60vh] py-6 px-4">
+    <div class="w-full max-w-[420px] bg-white rounded-2xl shadow-lg border border-slate-200/80 p-6 sm:p-10">
+      <div
+        class="w-14 h-14 text-primary rounded-full flex items-center justify-center mx-auto mb-5 py-4">
+        <img src="https://learnguage.online/_nuxt/logo-light-sm.CbssCni5.png" alt="Learnguage" class="h-14 w-auto" />
+      </div>
+      <h2 class="text-2xl font-bold text-center text-slate-800 mb-1">Admin Login</h2>
+      <p class="text-sm text-center text-text-secondary mb-6">Please log in to manage invoices.</p>
+
+      <form @submit.prevent="handleLogin" class="space-y-4">
+        <div v-if="error"
+          class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-lg text-sm">
+          <AlertCircle :size="18" class="shrink-0 text-red-600" />
+          <span>{{ error }}</span>
         </div>
-        
-        <div class="form-group">
-          <label>Password</label>
-          <input v-model="password" type="password" required placeholder="••••••••" />
+
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+          <div class="relative flex items-center">
+            <Mail :size="18" class="absolute left-3.5 text-slate-400 pointer-events-none" />
+            <input v-model="email" type="email" required placeholder="admin@learnguage.online"
+              class="w-full pl-10 pr-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary  transition" />
+          </div>
         </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
+          <div class="relative flex items-center">
+            <Lock :size="18" class="absolute left-3.5 text-slate-400 pointer-events-none" />
+            <input v-model="password" type="password" required placeholder="••••••••"
+              class="w-full pl-10 pr-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary  transition" />
+          </div>
+        </div>
+
+        <button type="submit"
+          class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white font-semibold py-2.5 px-4 rounded-lg shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed pt-3 pb-3"
+          :disabled="loading">
+          <Loader2 v-if="loading" :size="18" class="animate-spin shrink-0" />
         
-        <button type="submit" class="btn-primary w-full" :disabled="loading">
-          {{ loading ? 'Logging in...' : 'Login' }}
+          <span>{{ loading ? 'Logging in...' : 'Login' }}</span>
         </button>
       </form>
     </div>
   </div>
 </template>
-
-<style scoped>
-.login-view {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 60vh;
-  padding: 1rem 0;
-}
-
-.login-card {
-  background: white;
-  padding: 2.5rem;
-  border-radius: 1rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  width: 100%;
-  max-width: 400px;
-}
-
-h2 { margin-bottom: 0.5rem; text-align: center; color: #1e293b; }
-p { margin-bottom: 2rem; text-align: center; color: #64748b; }
-
-.form-group { margin-bottom: 1.5rem; }
-label { display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
-
-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-}
-
-.error-msg {
-  background-color: #fee2e2;
-  color: #991b1b;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.875rem;
-  text-align: center;
-}
-
-.btn-primary {
-  background-color: #2563eb;
-  color: white;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-primary:hover { background-color: #1d4ed8; }
-.btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
-.w-full { width: 100%; }
-
-@media (max-width: 480px) {
-  .login-card {
-    padding: 1.5rem;
-    border-radius: 0.875rem;
-  }
-}
-</style>

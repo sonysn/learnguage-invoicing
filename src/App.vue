@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { LogOut } from 'lucide-vue-next';
 
 const router = useRouter();
 const route = useRoute();
@@ -19,220 +20,50 @@ const logout = () => {
 </script>
 
 <template>
-  <div class="app-wrapper">
-    <nav class="top-nav" v-if="isLoggedIn">
-      <div class="container nav-content">
-        <div class="brand">
-          <router-link to="/">
-            <img src="https://learnguage.online/_nuxt/logo-light-sm.CbssCni5.png" alt="Learnguage" class="nav-logo" />
-            <span class="brand-text">Invoicing</span>
+  <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+    <nav v-if="isLoggedIn" class="sticky top-0 z-50 bg-white/95 backdrop-blur-xs border-b border-slate-200">
+      <div
+        class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <!-- Brand -->
+        <div class="flex items-center">
+          <router-link to="/" class="flex items-center gap-3">
+            <img src="https://learnguage.online/_nuxt/logo-light-sm.CbssCni5.png" alt="Learnguage" class="h-8 w-auto" />
+            <span class="text-lg font-heading font-bold text-text-primary tracking-tight">Invoicing</span>
           </router-link>
         </div>
-        
-        <div class="nav-links">
-          <router-link to="/" class="nav-item">Dashboard</router-link>
-          <router-link to="/service-templates" class="nav-item">Service Templates</router-link>
-          <router-link to="/new" class="nav-item btn-create">Create Invoice</router-link>
-          <button @click="logout" class="btn-logout">Logout</button>
+
+        <!-- Nav Links -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-6 flex-wrap">
+          <router-link to="/"
+            class="inline-flex items-center gap-2 px-3 py-2 sm:px-0 sm:py-0 text-sm font-medium transition rounded-lg sm:rounded-none border sm:border-0 border-slate-200 sm:border-transparent bg-white sm:bg-transparent"
+            :class="route.path === '/' ? 'text-primary font-semibold' : 'text-slate-600 hover:text-primary'">
+
+            <span>Dashboard</span>
+          </router-link>
+
+          <router-link to="/service-templates"
+            class="inline-flex items-center gap-2 px-3 py-2 sm:px-0 sm:py-0 text-sm font-medium transition rounded-lg sm:rounded-none border sm:border-0 border-slate-200 sm:border-transparent bg-white sm:bg-transparent"
+            :class="route.path === '/service-templates' ? 'text-primary font-semibold' : 'text-slate-600 hover:text-primary'">
+
+            <span>Service Templates</span>
+          </router-link>
+
+
+
+          <button @click="logout"
+            class="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-neutral text-white rounded-md hover:opacity-90 transition cursor-pointer">
+            <LogOut :size="16" />
+            <span>Logout</span>
+          </button>
+
         </div>
       </div>
     </nav>
 
-    <main class="main-content">
-      <div class="container">
+    <main class="flex-1 py-8 sm:py-10 bg-background-light-surface">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <router-view />
       </div>
     </main>
   </div>
 </template>
-
-<style scoped>
-.app-wrapper {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.top-nav {
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-  min-height: 72px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.nav-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  min-height: 72px;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  gap: 1rem;
-}
-
-.brand a {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-}
-
-.nav-logo {
-  height: 32px;
-  width: auto;
-}
-
-.brand-text {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.025em;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.nav-item {
-  color: #475569;
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: color 0.2s;
-}
-
-.nav-item:hover {
-  color: #2563eb;
-}
-
-.router-link-active:not(.btn-create) {
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.btn-create {
-  background: #2563eb;
-  color: white !important;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-}
-
-.btn-create:hover {
-  background: #1d4ed8;
-}
-
-.btn-logout {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0;
-}
-
-.btn-logout:hover {
-  color: #ef4444;
-}
-
-.main-content {
-  flex-grow: 1;
-  padding: 3rem 0;
-}
-
-@media (max-width: 860px) {
-  .top-nav {
-    position: static;
-  }
-
-  .nav-content {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .nav-links {
-    width: 100%;
-    gap: 0.75rem;
-    justify-content: flex-start;
-  }
-
-  .btn-create {
-    padding-inline: 1rem;
-  }
-}
-
-@media (max-width: 560px) {
-  .brand a {
-    gap: 0.75rem;
-  }
-
-  .nav-logo {
-    height: 28px;
-  }
-
-  .brand-text {
-    font-size: 1rem;
-  }
-
-  .nav-links {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .nav-item,
-  .btn-create,
-  .btn-logout {
-    width: 100%;
-  }
-
-  .nav-item {
-    padding: 0.75rem 0.9rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.75rem;
-    background: #fff;
-  }
-
-  .btn-create {
-    text-align: center;
-  }
-
-  .btn-logout {
-    padding: 0.75rem 0.9rem;
-    text-align: left;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.75rem;
-    background: #fff;
-    color: #475569;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .top-nav {
-    background: #1e293b;
-    border-bottom-color: #334155;
-  }
-  .brand-text {
-    color: #f8fafc;
-  }
-  .nav-item {
-    color: #94a3b8;
-  }
-  .nav-item:hover {
-    color: #60a5fa;
-  }
-}
-
-@media (prefers-color-scheme: dark) and (max-width: 560px) {
-  .nav-item,
-  .btn-logout {
-    background: #1e293b;
-    border-color: #334155;
-  }
-}
-</style>

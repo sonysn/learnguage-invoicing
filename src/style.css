@@ -1,13 +1,15 @@
-:root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import url('https://fonts.googleapis.com/css2?family=Georama:ital,wght@0,100..900;1,100..900&family=Marcellus&display=swap');
 
-  color-scheme: light dark;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Georama", sans-serif;
+  line-height: 1.5;
+  color-scheme: light;
   color: #1e293b;
   background-color: #f8fafc;
-
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -25,105 +27,31 @@ body {
 }
 
 * {
-  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #55CABB transparent;
 }
 
-img {
-  max-width: 100%;
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
 }
 
-a {
-  font-weight: 500;
-  color: #2563eb;
-  text-decoration: none;
-  transition: color 0.2s;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-a:hover {
-  color: #1d4ed8;
+::-webkit-scrollbar-thumb {
+  background: #30BEAD;
+  border-radius: 9999px;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
-h1, h2, h3, h4 {
-  color: #0f172a;
-  margin-top: 0;
+::-webkit-scrollbar-thumb:hover {
+  background: #269889;
+  box-shadow: 0 0 8px #55CABB;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Global Container */
-.container {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-/* Shared Button Styles */
-.btn-primary {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.btn-primary:hover {
-  background: #1d4ed8;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-.btn-secondary {
-  background: white;
-  color: #475569;
-  border: 1px solid #e2e8f0;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-}
-
-.btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-@media (max-width: 768px) {
-  .container {
-    padding: 0 1rem;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    min-height: 44px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f1f5f9;
-    background-color: #0f172a;
-  }
-  
-  body {
-    background-color: #0f172a;
-  }
-
-  h1, h2, h3, h4 {
-    color: #f8fafc;
-  }
-
-  .btn-secondary {
-    background: #1e293b;
-    border-color: #334155;
-    color: #f1f5f9;
-  }
-
-  .btn-secondary:hover {
-    background: #334155;
-  }
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
