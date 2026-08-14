@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import {
+  RefreshCw,
+  Plus,
+  Pencil,
+  Trash2,
+  Layers,
+  X,
+  Loader2,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+} from 'lucide-vue-next';
 import { serviceTemplatesApi } from '../api';
 
 interface ServiceTemplate {
@@ -13,8 +25,36 @@ interface ServiceTemplate {
 const templates = ref<ServiceTemplate[]>([]);
 const loading = ref(true);
 const saving = ref(false);
+const deleting = ref(false);
 const showFormModal = ref(false);
+const showDeleteModal = ref(false);
+const templateToDelete = ref<ServiceTemplate | null>(null);
 const editingTemplate = ref<ServiceTemplate | null>(null);
+
+const alertModal = ref<{
+  show: boolean;
+  title: string;
+  message: string;
+  type: 'error' | 'warning' | 'info';
+}>({
+  show: false,
+  title: '',
+  message: '',
+  type: 'error'
+});
+
+const showAlert = (message: string, title = 'Notice', type: 'error' | 'warning' | 'info' = 'error') => {
+  alertModal.value = {
+    show: true,
+    title,
+    message,
+    type
+  };
+};
+
+const closeAlert = () => {
+  alertModal.value.show = false;
+};
 
 const form = ref({
   item_name: '',
@@ -54,11 +94,11 @@ const openEditModal = (template: ServiceTemplate) => {
 
 const saveTemplate = async () => {
   if (!form.value.description.trim()) {
-    alert('Description is required.');
+    showAlert('Description is required.', 'Validation Error', 'warning');
     return;
   }
   if (form.value.default_unit_price < 0) {
-    alert('Price must be a positive number.');
+    showAlert('Price must be a positive number.', 'Validation Error', 'warning');
     return;
   }
 
@@ -72,20 +112,31 @@ const saveTemplate = async () => {
     showFormModal.value = false;
     await fetchTemplates();
   } catch (err: any) {
-    alert('Error saving template: ' + (err.response?.data?.detail || err.message));
+    showAlert('Error saving template: ' + (err.response?.data?.detail || err.message), 'Save Error', 'error');
   } finally {
     saving.value = false;
   }
 };
 
-const deleteTemplate = async (id: number, item_name: string) => {
-  if (!confirm(`Are you sure you want to delete "${item_name}"? This cannot be undone.`)) return;
+const confirmDeleteTemplate = (template: ServiceTemplate) => {
+  templateToDelete.value = template;
+  showDeleteModal.value = true;
+};
+
+const executeDeleteTemplate = async () => {
+  if (!templateToDelete.value) return;
 
   try {
-    await serviceTemplatesApi.delete(id);
+    deleting.value = true;
+    await serviceTemplatesApi.delete(templateToDelete.value.id);
+    showDeleteModal.value = false;
+    templateToDelete.value = null;
     await fetchTemplates();
   } catch (err: any) {
-    alert('Error deleting template: ' + (err.response?.data?.detail || err.message));
+    showDeleteModal.value = false;
+    showAlert('Error deleting template: ' + (err.response?.data?.detail || err.message), 'Delete Error', 'error');
+  } finally {
+    deleting.value = false;
   }
 };
 
@@ -97,66 +148,75 @@ const formatPrice = (price: number) => {
 </script>
 
 <template>
-  <div class="service-templates-view">
-    <div class="page-header">
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
       <div>
-        <h1>Service Templates</h1>
-        <p class="subtitle">Manage reusable service descriptions and prices</p>
+        <h1 class="text-2xl sm:text-3xl font-extrabold font-heading text-text-primary tracking-tight">Service Templates</h1>
+        <p class="text-sm sm:text-base text-text-secondary mt-1">Manage reusable service descriptions and prices</p>
       </div>
-      <div class="header-actions">
-        <button @click="fetchTemplates" class="btn-secondary" :disabled="loading">
-          {{ loading ? 'Updating...' : 'Refresh' }}
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
+        <button @click="fetchTemplates"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition shadow-xs disabled:opacity-60 w-full sm:w-auto"
+          :disabled="loading">
+          <RefreshCw :size="16" :class="{ 'animate-spin': loading }" />
+          <span>{{ loading ? 'Updating...' : 'Refresh' }}</span>
         </button>
-        <button @click="openCreateModal" class="btn-primary">+ New Template</button>
+        <button @click="openCreateModal"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition w-full sm:w-auto">
+          <Plus :size="16" stroke-width="2.5" />
+          <span>New Template</span>
+        </button>
       </div>
     </div>
 
-    <div v-if="loading && templates.length === 0" class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading templates...</p>
+    <!-- Loading State -->
+    <div v-if="loading && templates.length === 0"
+      class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-slate-200 text-text-secondary gap-3">
+      <Loader2 :size="36" class="animate-spin text-primary" />
+      <p class="text-sm font-medium">Loading templates...</p>
     </div>
 
-    <div v-else class="card table-card">
-      <div class="table-wrapper">
-        <table v-if="templates.length > 0">
+    <!-- Table Card -->
+    <div v-else class="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+      <div class="overflow-x-auto">
+        <table v-if="templates.length > 0" class="w-full border-collapse text-left text-sm min-w-[760px]">
           <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Currency</th>
-              <th>Default Price</th>
-              <th>Description</th>
-              <th class="text-right">Actions</th>
+            <tr class="border-b border-slate-200 bg-slate-50/50">
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Item Name</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Currency</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Default Price</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Description</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions
+              </th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="template in templates" :key="template.id">
-              <td>
-                <span class="item-name-text">{{ template.item_name }}</span>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="template in templates" :key="template.id" class="hover:bg-slate-50/80 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap font-semibold text-text-primary text-sm">
+                {{ template.item_name }}
               </td>
-              <td>
-                <span class="currency-badge">{{ template.currency }}</span>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
+                  {{ template.currency }}
+                </span>
               </td>
-              <td>
-                <span class="price-text">{{ template.currency }} {{ formatPrice(template.default_unit_price) }}</span>
+              <td class="px-6 py-4 whitespace-nowrap font-bold font-numbers text-primary text-sm">
+                {{ template.currency }} {{ formatPrice(template.default_unit_price) }}
               </td>
-              <td class="description-cell">
-                {{ template.description || '---' }}
+              <td class="px-6 py-4 max-w-[280px] truncate text-text-secondary text-xs sm:text-sm">
+                {{ template.description || '—' }}
               </td>
-              <td class="actions-cell">
-                <div class="actions-group">
-                  <button
-                    @click="openEditModal(template)"
-                    class="action-btn edit"
-                    title="Edit"
-                  >
-                    Edit
+              <td class="px-6 py-4 whitespace-nowrap text-right">
+                <div class="inline-flex items-center justify-end gap-1.5">
+                  <button @click="openEditModal(template)" data-tooltip="Edit"
+                    class="group relative inline-flex items-center justify-center p-2 text-primary hover:bg-blue-50 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Pencil :size="15" />
                   </button>
-                  <button
-                    @click="deleteTemplate(template.id, template.item_name)"
-                    class="action-btn delete"
-                    title="Delete"
-                  >
-                    Delete
+                  <button @click="confirmDeleteTemplate(template)" data-tooltip="Delete"
+                    class="group relative inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Trash2 :size="15" />
                   </button>
                 </div>
               </td>
@@ -164,44 +224,67 @@ const formatPrice = (price: number) => {
           </tbody>
         </table>
 
-        <div v-else class="empty-state">
-          <div class="empty-illustration">📋</div>
-          <h3>No service templates yet</h3>
-          <p>Create templates to quickly add common services to invoices.</p>
-          <button @click="openCreateModal" class="btn-primary">Create First Template</button>
+        <!-- Empty State -->
+        <div v-else class="flex flex-col items-center justify-center py-20 px-6 text-center">
+          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+            <Layers :size="32" />
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-slate-800 mb-1">
+            No service templates yet
+          </h3>
+          <p class="text-sm text-text-secondary mb-5 max-w-sm">
+            Create templates to quickly add common services to invoices.
+          </p>
+          <button @click="openCreateModal"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition">
+            <Plus :size="16" stroke-width="2.5" />
+            <span>Create First Template</span>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Create/Edit Modal -->
-    <div v-if="showFormModal" class="modal-overlay" @click.self="showFormModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ editingTemplate ? 'Edit Template' : 'Create New Template' }}</h2>
-          <button @click="showFormModal = false" class="btn-close">&times;</button>
+    <div v-if="showFormModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="!saving && (showFormModal = false)">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between p-5 border-b border-slate-200">
+          <div class="flex items-center gap-2">
+           
+            <h2 class="text-lg font-bold text-text-primary">
+              {{ editingTemplate ? 'Edit Template' : 'Create New Template' }}
+            </h2>
+          </div>
+          <button @click="showFormModal = false"
+            class="w-8 h-8 rounded-lg text-text-secondary hover:bg-slate-100 flex items-center justify-center transition"
+            title="Close">
+            <X :size="18" />
+          </button>
         </div>
-        <form @submit.prevent="saveTemplate">
-          <div class="form-group">
-            <label>Item Name *</label>
-            <input
-              v-model="form.item_name"
-              type="text"
-              required
-              placeholder="e.g. Spanish Tutoring"
-            />
+
+        <form @submit.prevent="saveTemplate" class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Item Name
+              *</label>
+            <input v-model="form.item_name" type="text" required placeholder="e.g. Spanish Tutoring"
+              class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
           </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea
-              v-model="form.description"
-              rows="3"
-              placeholder="Detailed description of the service..."
-            ></textarea>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Description
+              *</label>
+            <textarea v-model="form.description" rows="3" required placeholder="Detailed description of the service..."
+              class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition"></textarea>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Currency *</label>
-              <select v-model="form.currency" required>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Currency
+                *</label>
+              <select v-model="form.currency" required
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition">
                 <option value="USD">USD ($)</option>
                 <option value="NGN">NGN (₦)</option>
                 <option value="GBP">GBP (£)</option>
@@ -209,124 +292,96 @@ const formatPrice = (price: number) => {
                 <option value="CAD">CAD (C$)</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Default Unit Price *</label>
-              <input
-                v-model.number="form.default_unit_price"
-                type="number"
-                step="0.01"
-                min="0"
-                required
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Default Unit
+                Price *</label>
+              <input v-model.number="form.default_unit_price" type="number" step="0.01" min="0" required
                 placeholder="0.00"
-              />
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
             </div>
           </div>
-          <div class="form-footer">
-            <button type="button" @click="showFormModal = false" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? 'Saving...' : (editingTemplate ? 'Update' : 'Create') }}
+
+          <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-200">
+            <button type="button" @click="showFormModal = false"
+              class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+              Cancel
+            </button>
+            <button type="submit"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="saving">
+              <Loader2 v-if="saving" :size="16" class="animate-spin shrink-0" />
+              
+              <span>{{ saving ? 'Saving...' : (editingTemplate ? 'Update Template' : 'Create Template') }}</span>
             </button>
           </div>
         </form>
       </div>
     </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="!deleting && (showDeleteModal = false)">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <Trash2 :size="22" />
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-text-primary">Delete Template</h3>
+            <p class="text-sm text-text-secondary">
+              Are you sure you want to delete <strong class="text-slate-800 font-semibold">"{{ templateToDelete?.item_name }}"</strong>? This action cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <button type="button" @click="showDeleteModal = false" :disabled="deleting"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition disabled:opacity-50">
+            Cancel
+          </button>
+          <button type="button" @click="executeDeleteTemplate" :disabled="deleting"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
+            <Loader2 v-if="deleting" :size="16" class="animate-spin shrink-0" />
+            <span>{{ deleting ? 'Deleting...' : 'Delete Template' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert / Notification Modal -->
+    <div v-if="alertModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="closeAlert">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div v-if="alertModal.type === 'error'"
+            class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <AlertCircle :size="22" />
+          </div>
+          <div v-else-if="alertModal.type === 'warning'"
+            class="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+            <AlertTriangle :size="22" />
+          </div>
+          <div v-else
+            class="w-11 h-11 rounded-full bg-blue-100 text-primary flex items-center justify-center shrink-0">
+            <Info :size="22" />
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-lg font-bold text-text-primary">{{ alertModal.title }}</h3>
+            <p class="text-sm text-text-secondary whitespace-pre-line leading-relaxed">{{ alertModal.message }}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+          <button type="button" @click="closeAlert"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm transition">
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; }
-h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.25rem; }
-.subtitle { color: #64748b; margin: 0; }
-.header-actions { display: flex; gap: 0.75rem; }
-
-.card { background: white; border-radius: 1rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow: hidden; }
-.table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-table { width: 100%; border-collapse: collapse; min-width: 760px; }
-th { background: #f8fafc; padding: 1rem 1.5rem; text-align: left; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #e2e8f0; }
-td { padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background-color: #f8fafc; }
-
-.description-text { font-weight: 500; color: #0f172a; }
-.price-text { font-weight: 700; color: #2563eb; font-size: 1rem; }
-
-.actions-cell { text-align: right; }
-.actions-group { display: inline-flex; justify-content: flex-end; gap: 0.5rem; white-space: nowrap; }
-.action-btn { padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.8125rem; font-weight: 600; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.2s; }
-.action-btn.edit { color: #2563eb; }
-.action-btn.edit:hover { background: #eff6ff; }
-.action-btn.delete { color: #ef4444; }
-.action-btn.delete:hover { background: #fef2f2; }
-
-.empty-state { padding: 5rem 2rem; text-align: center; }
-.empty-illustration { font-size: 4rem; margin-bottom: 1.5rem; }
-.empty-state h3 { margin-bottom: 0.5rem; }
-.empty-state p { color: #64748b; margin-bottom: 2rem; }
-
-.item-name-text { font-weight: 600; color: #0f172a; }
-.currency-badge { display: inline-block; padding: 0.25rem 0.5rem; background: #f1f5f9; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; color: #475569; }
-.price-text { font-weight: 700; color: #2563eb; font-size: 0.9375rem; }
-.description-cell { max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #64748b; font-size: 0.8125rem; }
-
-/* Modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: white; border-radius: 1rem; padding: 2rem; max-width: 500px; width: 90%; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.modal-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-.btn-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; }
-
-.form-group { margin-bottom: 1.25rem; }
-label { display: block; font-size: 0.875rem; font-weight: 600; color: #475569; margin-bottom: 0.5rem; }
-textarea, input[type="number"] { width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; transition: all 0.2s; font-family: inherit; }
-textarea:focus, input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-
-.form-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #f1f5f9; }
-
-.text-right { text-align: right; }
-
-@media (max-width: 768px) {
-  .page-header,
-  .form-footer {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-
-  .header-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .header-actions > * {
-    width: 100%;
-  }
-
-  .modal-content {
-    width: calc(100% - 1rem);
-    padding: 1.25rem;
-  }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-}
-
-@media (max-width: 480px) {
-  h1 {
-    font-size: 1.625rem;
-  }
-}
-
-/* Dark Mode */
-@media (prefers-color-scheme: dark) {
-  .card { background: #1e293b; border-color: #334155; }
-  th { background: #1a2233; border-color: #334155; }
-  td { border-color: #334155; }
-  .description-text { color: #f8fafc; }
-  tr:hover td { background-color: #1a2233; }
-  .modal-content { background: #1e293b; }
-}
-</style>

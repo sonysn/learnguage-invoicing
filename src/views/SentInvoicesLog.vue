@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import {
+  RefreshCw,
+  ArrowLeft,
+  Search,
+  X,
+  FileDown,
+  Trash2,
+  AlertCircle,
+  SearchX,
+  MailCheck,
+  Loader2,
+} from 'lucide-vue-next';
 import api from '../api';
 
 interface SentInvoice {
@@ -108,7 +120,7 @@ const filteredInvoices = computed(() => {
 
 const totalsByCurrency = computed(() => {
   const totals: Record<string, number> = {};
-  
+
   filteredInvoices.value.forEach(invoice => {
     const currency = invoice.currency || 'Unknown';
     if (!totals[currency]) {
@@ -116,135 +128,154 @@ const totalsByCurrency = computed(() => {
     }
     totals[currency] += Number(invoice.total_amount);
   });
-  
+
   return totals;
 });
 </script>
 
 <template>
-  <div class="sent-invoices-log">
-    <div class="page-header">
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="">
+      <router-link to="/"
+        class="inline-flex items-center justify-center gap-2 py-2 text-secondary hover:text-secondary-dark active:text-secondary-base rounded-lg text-sm font-semibold transition w-full sm:w-auto">
+        <ArrowLeft :size="16" />
+        <span>Back to Invoices</span>
+      </router-link>
+
+    </div>
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+
       <div>
-        <h1>Sent Invoices Log</h1>
-        <p class="subtitle">Immutable record of all invoices sent to recipients. These are fixed snapshots and cannot be edited.</p>
+        <h1 class="text-2xl sm:text-3xl font-extrabold font-heading text-text-primary tracking-tight">Sent Invoices Log
+        </h1>
+        <p class="text-sm sm:text-base text-text-secondary mt-1 max-w-2xl">
+          Immutable record of all invoices sent to recipients. These are fixed snapshots and cannot be edited.
+        </p>
       </div>
-      <div class="header-actions">
-        <button @click="fetchInvoices" class="btn-secondary" :disabled="loading">
-          {{ loading ? 'Updating...' : 'Refresh' }}
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
+        <button @click="fetchInvoices"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition shadow-xs disabled:opacity-60 w-full sm:w-auto"
+          :disabled="loading">
+          <RefreshCw :size="16" :class="{ 'animate-spin': loading }" />
+          <span>{{ loading ? 'Updating...' : 'Refresh' }}</span>
         </button>
-        <router-link to="/" class="btn-primary">← Back to Invoices</router-link>
+
       </div>
     </div>
 
     <!-- Summary Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Sent Invoices</div>
-        <div class="stat-value">{{ filteredInvoices.length }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div
+        class="bg-white p-5 rounded-2xl border border-slate-200 shadow-lg sm:odd:last:col-span-2 md:odd:last:col-span-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Total Sent Invoices</div>
+        <div class="text-2xl sm:text-3xl font-bold text-primary font-numbers">{{ filteredInvoices.length }}</div>
       </div>
-    </div>
-
-    <!-- Totals by Currency -->
-    <div v-if="Object.keys(totalsByCurrency).length > 0" class="currency-totals">
-      <h3 class="section-label">Total Amount by Currency</h3>
-      <div class="currency-grid">
-        <div v-for="(amount, currency) in totalsByCurrency" :key="currency" class="currency-card">
-          <div class="currency-code">{{ currency }}</div>
-          <div class="currency-amount">{{ amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}</div>
+      <div v-for="(amount, currency) in totalsByCurrency" :key="currency"
+        class="bg-white p-5 rounded-2xl border border-slate-200 shadow-lg sm:odd:last:col-span-2 md:odd:last:col-span-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">{{ currency }} Total</div>
+        <div class="text-2xl sm:text-3xl font-bold text-primary font-numbers">
+          {{ amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
         </div>
       </div>
     </div>
 
-    <div v-if="loading && invoices.length === 0" class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading sent invoices...</p>
+    <!-- Loading State -->
+    <div v-if="loading && invoices.length === 0"
+      class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-slate-200 text-text-secondary gap-3">
+      <Loader2 :size="36" class="animate-spin text-primary" />
+      <p class="text-sm font-medium">Loading sent invoices...</p>
     </div>
 
-    <div v-else-if="error" class="error-container">
-      <div class="error-icon">!</div>
-      <p>{{ error }}</p>
-      <button @click="fetchInvoices" class="btn-secondary">Try Again</button>
+    <!-- Error State -->
+    <div v-else-if="error"
+      class="flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-2xl border border-red-200 shadow-xs gap-4">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+        <AlertCircle :size="24" />
+      </div>
+      <p class="text-red-700 font-medium text-sm sm:text-base max-w-md">{{ error }}</p>
+      <button @click="fetchInvoices"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+        <RefreshCw :size="16" />
+        <span>Try Again</span>
+      </button>
     </div>
 
-    <div v-else class="card table-card">
-      <div class="table-header">
-        <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search by name, email, or invoice number..."
-            class="search-input"
-          />
-          <button
-            v-if="searchQuery"
-            @click="searchQuery = ''"
-            class="clear-search"
-            title="Clear search"
-          >
-            &times;
+    <!-- Table Card -->
+    <div v-else class="bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+      <!-- Search and Header Bar -->
+      <div
+        class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 gap-3">
+        <div class="relative flex items-center flex-1 max-w-full sm:max-w-md">
+          <Search :size="18" class="absolute left-3 text-slate-400 pointer-events-none" />
+          <input v-model="searchQuery" type="text" placeholder="Search by name, email, or invoice number..."
+            class="w-full pl-9 pr-9 py-2 text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+          <button v-if="searchQuery" @click="searchQuery = ''"
+            class="absolute right-2.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-text-secondary flex items-center justify-center transition"
+            title="Clear search">
+            <X :size="12" />
           </button>
         </div>
-        <div class="results-count">
+        <div class="text-xs sm:text-sm text-text-secondary font-medium whitespace-nowrap">
           {{ filteredInvoices.length }} invoice(s)
         </div>
       </div>
-      <div class="table-wrapper">
-        <table v-if="filteredInvoices.length > 0">
+
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <table v-if="filteredInvoices.length > 0" class="w-full border-collapse text-left text-sm min-w-[950px]">
           <thead>
-            <tr>
-              <th>Invoice #</th>
-              <th>Recipient</th>
-              <th>Email</th>
-              <th>Amount</th>
-              <th>Sent Date/Time</th>
-              <th>Due Date</th>
-              <th class="text-right">Actions</th>
+            <tr class="border-b border-slate-200 bg-slate-50/50">
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Invoice #</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Recipient</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Email</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Amount</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Sent Date/Time</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Due Date</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions
+              </th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="invoice in filteredInvoices" :key="invoice.id">
-              <td>
-                <span class="invoice-id">{{ invoice.invoice_number }}</span>
-              </td>
-              <td>
-                <span class="name">{{ invoice.recipient_name }}</span>
-              </td>
-              <td>
-                <span class="email">{{ invoice.recipient_email }}</span>
-              </td>
-              <td>
-                <span class="amount-text">
-                  {{ invoice.currency }} {{ parseFloat(invoice.total_amount.toString()).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="invoice in filteredInvoices" :key="invoice.id" class="hover:bg-slate-50/80 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  class="inline-flex items-center font-mono font-semibold font-numbers text-xs px-2.5 py-1 rounded bg-slate-100 text-slate-800">
+                  {{ invoice.invoice_number }}
                 </span>
               </td>
-              <td class="date-cell">
-                <div class="sent-date">{{ formatDateTime(invoice.sent_at) }}</div>
+              <td class="px-6 py-4 whitespace-nowrap font-semibold text-text-primary text-sm">
+                {{ invoice.recipient_name }}
               </td>
-              <td class="date-cell">
-                <span :class="['due-date', { overdue: invoice.due_date && new Date(invoice.due_date) < new Date() }]">
+              <td class="px-6 py-4 whitespace-nowrap text-xs text-text-secondary">
+                {{ invoice.recipient_email }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap font-bold font-numbers text-text-primary text-sm">
+                {{ invoice.currency }} {{ parseFloat(invoice.total_amount.toString()).toLocaleString(undefined, {
+                  minimumFractionDigits: 2
+                }) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-700">
+                {{ formatDateTime(invoice.sent_at) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-xs">
+                <span
+                  :class="invoice.due_date && new Date(invoice.due_date) < new Date() ? 'text-red-600 font-semibold' : 'text-text-secondary'">
                   {{ formatDate(invoice.due_date) }}
                 </span>
               </td>
-              <td class="actions-cell">
-                <div class="actions-group">
-                  <button
-                    @click="downloadPdf(invoice.id, invoice.invoice_number)"
-                    class="action-btn view-pdf"
-                    title="Download the exact PDF that was sent"
-                  >
-                    Download PDF
+              <td class="px-6 py-4 whitespace-nowrap text-right">
+                <div class="inline-flex items-center justify-end gap-1.5">
+                  <button @click="downloadPdf(invoice.id, invoice.invoice_number)" data-tooltip="Download PDF"
+                    class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <FileDown :size="15" />
                   </button>
-                  <button
-                    @click="deleteSentInvoice(invoice.id, invoice.invoice_number)"
+                  <button @click="deleteSentInvoice(invoice.id, invoice.invoice_number)"
                     :disabled="deletingId === invoice.id"
-                    class="action-btn delete"
-                    title="Delete this sent invoice record"
-                  >
-                    {{ deletingId === invoice.id ? 'Deleting...' : 'Delete' }}
+                    :data-tooltip="deletingId === invoice.id ? 'Deleting...' : 'Delete'"
+                    class="group relative inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition disabled:opacity-50 before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Loader2 v-if="deletingId === invoice.id" :size="15" class="animate-spin" />
+                    <Trash2 v-else :size="15" />
                   </button>
                 </div>
               </td>
@@ -252,493 +283,33 @@ const totalsByCurrency = computed(() => {
           </tbody>
         </table>
 
-        <div v-else class="empty-state">
-          <div class="empty-illustration">📧</div>
-          <h3>No sent invoices found</h3>
-          <p v-if="searchQuery">No invoices match your search: "<strong>{{ searchQuery }}</strong>"</p>
-          <p v-else>There are no sent invoices yet. Mark an invoice as sent from the dashboard.</p>
-          <router-link v-if="!searchQuery" to="/" class="btn-primary">Go to Dashboard</router-link>
-          <button v-else @click="searchQuery = ''" class="btn-secondary">Clear Search</button>
+        <!-- Empty State -->
+        <div v-else class="flex flex-col items-center justify-center py-20 px-6 text-center">
+          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+            <SearchX v-if="searchQuery" :size="32" />
+            <MailCheck v-else :size="32" />
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-slate-800 mb-1">
+            {{ searchQuery ? 'No sent invoices found' : 'No sent invoices yet' }}
+          </h3>
+          <p v-if="searchQuery" class="text-sm text-text-secondary mb-5 max-w-sm">
+            No invoices match your search: "<strong>{{ searchQuery }}</strong>"
+          </p>
+          <p v-else class="text-sm text-text-secondary mb-5 max-w-sm">
+            There are no sent invoices yet. Mark an invoice as sent from the dashboard.
+          </p>
+          <router-link v-if="!searchQuery" to="/"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition">
+            <ArrowLeft :size="16" />
+            <span>Go to Dashboard</span>
+          </router-link>
+          <button v-else @click="searchQuery = ''"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+            <X :size="16" />
+            <span>Clear Search</span>
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 2.5rem;
-}
-
-h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  margin-bottom: 0.25rem;
-}
-
-.subtitle {
-  color: #64748b;
-  font-size: 1rem;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-/* Stats Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-  margin-bottom: 0.5rem;
-}
-
-.stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.stat-value.amount {
-  color: #2563eb;
-}
-
-/* Currency Totals */
-.currency-totals {
-  margin-bottom: 2rem;
-}
-
-.section-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 0.75rem;
-}
-
-.currency-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.currency-card {
-  background: white;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.currency-code {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-}
-
-.currency-amount {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #2563eb;
-}
-
-/* Card Styling */
-.card {
-  background: white;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 280px;
-  max-width: 400px;
-  position: relative;
-}
-
-.search-icon {
-  width: 20px;
-  height: 20px;
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  padding: 0.625rem 1rem;
-  padding-left: 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  background: white;
-  transition: all 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.search-input::placeholder {
-  color: #94a3b8;
-}
-
-.clear-search {
-  background: #f1f5f9;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #64748b;
-  font-size: 1.25rem;
-  line-height: 1;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.clear-search:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.results-count {
-  font-size: 0.875rem;
-  color: #64748b;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 980px;
-}
-
-th {
-  background: #f8fafc;
-  padding: 1rem 1.5rem;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-td {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover td {
-  background-color: #f8fafc;
-}
-
-/* Cell Content */
-.invoice-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 600;
-  color: #0f172a;
-  background: #f1f5f9;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-}
-
-.name {
-  font-weight: 600;
-  color: #0f172a;
-  font-size: 0.9375rem;
-}
-
-.email {
-  font-size: 0.8125rem;
-  color: #64748b;
-}
-
-.amount-text {
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.date-cell {
-  color: #64748b;
-  font-size: 0.875rem;
-}
-
-.sent-date {
-  font-weight: 500;
-  color: #0f172a;
-}
-
-.due-date {
-  color: #64748b;
-}
-
-.due-date.overdue {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-/* Recurring Pills */
-.recurring-pill {
-  display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.no-recurring {
-  color: #cbd5e1;
-  font-size: 1.25rem;
-}
-
-/* Actions */
-.actions-cell {
-  text-align: right;
-}
-
-.actions-group {
-  display: inline-flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  white-space: nowrap;
-}
-
-.action-btn {
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-btn.resend {
-  border-color: #e2e8f0;
-  color: #475569;
-}
-
-.action-btn.resend:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.action-btn.view-pdf {
-  color: #64748b;
-  border-color: #e2e8f0;
-}
-
-.action-btn.view-pdf:hover {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.action-btn.delete {
-  color: #dc2626;
-  border-color: #fecaca;
-}
-
-.action-btn.delete:hover:not(:disabled) {
-  background: #fee2e2;
-  border-color: #fca5a5;
-}
-
-.action-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Empty State */
-.empty-state {
-  padding: 5rem 2rem;
-  text-align: center;
-}
-
-.empty-illustration {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-}
-
-.empty-state h3 {
-  margin-bottom: 0.5rem;
-}
-
-.empty-state p {
-  color: #64748b;
-  margin-bottom: 2rem;
-}
-
-.text-right { text-align: right; }
-
-@media (max-width: 960px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .header-actions {
-    flex-wrap: wrap;
-  }
-
-  .table-header {
-    align-items: stretch;
-  }
-
-  .search-box {
-    max-width: none;
-    width: 100%;
-  }
-}
-
-@media (max-width: 640px) {
-  h1 {
-    font-size: 1.625rem;
-  }
-
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-actions > * {
-    width: 100%;
-    text-align: center;
-  }
-
-  .table-header {
-    padding: 1rem;
-  }
-
-  .search-box {
-    min-width: 0;
-  }
-
-  .stats-grid,
-  .currency-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Dark Mode Overrides */
-@media (prefers-color-scheme: dark) {
-  .card {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  .stat-card {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  .currency-card {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  .table-header {
-    background: #1a2233;
-    border-color: #334155;
-  }
-  th {
-    background: #1a2233;
-    border-color: #334155;
-  }
-  td {
-    border-color: #334155;
-  }
-  .invoice-id {
-    background: #334155;
-    color: #f1f5f9;
-  }
-  .name, .amount-text, .sent-date { color: #f8fafc; }
-  tr:hover td { background-color: #1a2233; }
-  .action-btn.resend { border-color: #334155; color: #94a3b8; }
-  .action-btn.resend:hover { background: #334155; }
-  .search-input {
-    background: #1e293b;
-    border-color: #334155;
-    color: #f8fafc;
-  }
-  .search-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-  .search-input::placeholder {
-    color: #64748b;
-  }
-  .clear-search {
-    background: #334155;
-    color: #94a3b8;
-  }
-  .clear-search:hover {
-    background: #475569;
-    color: #f8fafc;
-  }
-  .results-count {
-    color: #94a3b8;
-  }
-}
-</style>

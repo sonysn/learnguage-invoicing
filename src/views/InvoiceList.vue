@@ -1,5 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import {
+  Mail,
+  RefreshCw,
+  Plus,
+  Search,
+  X,
+  Send,
+  RotateCw,
+  Pencil,
+  FileDown,
+  Trash2,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  SearchX,
+  Inbox,
+  Loader2,
+} from 'lucide-vue-next';
 import api from '../api';
 
 interface Invoice {
@@ -22,6 +41,51 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
 
+const showDeleteModal = ref(false);
+const invoiceToDelete = ref<{
+  id: number;
+  invoice_number: string;
+  status: string;
+  recipient_email: string;
+  is_recurring: boolean;
+} | null>(null);
+const deleting = ref(false);
+
+const showSendModal = ref(false);
+const invoiceToSend = ref<{
+  id: number;
+  invoice_number: string;
+  recipient_name: string;
+  recipient_email: string;
+} | null>(null);
+const sending = ref(false);
+const resendingId = ref<number | null>(null);
+
+const alertModal = ref<{
+  show: boolean;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+}>({
+  show: false,
+  title: '',
+  message: '',
+  type: 'error'
+});
+
+const showAlert = (message: string, title = 'Notice', type: 'success' | 'error' | 'warning' | 'info' = 'error') => {
+  alertModal.value = {
+    show: true,
+    title,
+    message,
+    type
+  };
+};
+
+const closeAlert = () => {
+  alertModal.value.show = false;
+};
+
 const fetchInvoices = async () => {
   try {
     loading.value = true;
@@ -36,44 +100,71 @@ const fetchInvoices = async () => {
   }
 };
 
-const markAsSent = async (id: number) => {
-  if (!confirm('Are you sure you want to mark this invoice as sent? This will send the PDF invoice to the student.')) return;
+const confirmMarkAsSent = (invoice: Invoice) => {
+  invoiceToSend.value = {
+    id: invoice.id,
+    invoice_number: invoice.invoice_number,
+    recipient_name: invoice.recipient_name,
+    recipient_email: invoice.recipient_email
+  };
+  showSendModal.value = true;
+};
+
+const executeMarkAsSent = async () => {
+  if (!invoiceToSend.value) return;
 
   try {
-    await api.post(`/invoices/${id}/mark_as_sent/`);
+    sending.value = true;
+    await api.post(`/invoices/${invoiceToSend.value.id}/mark_as_sent/`);
+    showSendModal.value = false;
+    invoiceToSend.value = null;
     await fetchInvoices();
+    showAlert('Invoice marked as sent and emailed to the student.', 'Invoice Sent', 'success');
   } catch (err: any) {
-    alert('Error: ' + (err.response?.data?.detail || err.message));
+    showSendModal.value = false;
+    showAlert('Error: ' + (err.response?.data?.detail || err.message), 'Send Failed', 'error');
+  } finally {
+    sending.value = false;
   }
 };
 
 const resendInvoice = async (id: number) => {
   try {
+    resendingId.value = id;
     await api.post(`/invoices/${id}/resend_invoice/`);
-    alert('Invoice resent successfully!');
+    showAlert('Invoice resent successfully!', 'Success', 'success');
   } catch (err: any) {
-    alert('Error: ' + (err.response?.data?.detail || err.message));
+    showAlert('Error: ' + (err.response?.data?.detail || err.message), 'Resend Failed', 'error');
+  } finally {
+    resendingId.value = null;
   }
 };
 
-const deleteInvoice = async (id: number, number: string, status: string, recipientEmail: string, isRecurring: boolean) => {
-  let message = `Are you sure you want to delete invoice ${number}? This action cannot be undone.\n\n`;
-  
-  if (status === 'sent') {
-    message = `⚠️ WARNING: This invoice has been sent to ${recipientEmail}.\n\n`;
-    message += `Deleting invoice ${number} cannot be undone.\n\n`;
-    if (isRecurring) {
-      message += '⚠️ This will also STOP future recurring invoices for this student.';
-    }
-  }
+const confirmDeleteInvoice = (invoice: Invoice) => {
+  invoiceToDelete.value = {
+    id: invoice.id,
+    invoice_number: invoice.invoice_number,
+    status: invoice.status,
+    recipient_email: invoice.recipient_email,
+    is_recurring: invoice.is_recurring
+  };
+  showDeleteModal.value = true;
+};
 
-  if (!confirm(message)) return;
+const executeDeleteInvoice = async () => {
+  if (!invoiceToDelete.value) return;
 
   try {
-    await api.delete(`/invoices/${id}/`);
+    deleting.value = true;
+    await api.delete(`/invoices/${invoiceToDelete.value.id}/`);
+    showDeleteModal.value = false;
+    invoiceToDelete.value = null;
     await fetchInvoices();
   } catch (err: any) {
-    alert('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
+    showDeleteModal.value = false;
+    showAlert('Error deleting invoice: ' + (err.response?.data?.detail || err.message), 'Delete Error', 'error');
+  } finally {
+    deleting.value = false;
   }
 };
 
@@ -91,7 +182,7 @@ const downloadPdf = async (id: number, number: string) => {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   } catch (err: any) {
-    alert('Error downloading PDF: ' + err.message);
+    showAlert('Error downloading PDF: ' + err.message, 'Download Failed', 'error');
   }
 };
 
@@ -105,12 +196,16 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const getStatusClass = (status: string) => {
+const getStatusBadgeClass = (status: string) => {
   switch (status) {
-    case 'sent': return 'status-sent';
-    case 'pending': return 'status-pending';
-    case 'cancelled': return 'status-cancelled';
-    default: return 'status-draft';
+    case 'sent':
+      return 'bg-blue-100 text-primary-light';
+    case 'pending':
+      return 'bg-amber-100 text-amber-800';
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-slate-100 text-slate-700';
   }
 };
 
@@ -126,7 +221,7 @@ const getRecurringLabel = (invoice: Invoice) => {
   if (!invoice.is_recurring) return null;
   const interval = invoice.recurrence_interval || 'none';
   if (interval === 'none') return null;
-  
+
   let label = interval.charAt(0).toUpperCase() + interval.slice(1);
   if (invoice.next_invoice_date) {
     const nextDate = new Date(invoice.next_invoice_date).toLocaleDateString('en-US', {
@@ -138,15 +233,25 @@ const getRecurringLabel = (invoice: Invoice) => {
   return label;
 };
 
-const getRecurringClass = (invoice: Invoice) => {
+const getRecurringBadgeClass = (invoice: Invoice) => {
   if (!invoice.is_recurring) return '';
-  const interval = invoice.recurrence_interval;
-  return `recurring-${interval}`;
+  switch (invoice.recurrence_interval) {
+    case 'weekly':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'monthly':
+      return 'bg-amber-100 text-amber-800';
+    case 'quarterly':
+      return 'bg-orange-100 text-orange-800';
+    case 'yearly':
+      return 'bg-indigo-100 text-indigo-800';
+    default:
+      return 'bg-blue-100 text-primary-light';
+  }
 };
 
 const filteredInvoices = computed(() => {
   if (!searchQuery.value.trim()) return invoices.value;
-  
+
   const query = searchQuery.value.toLowerCase().trim();
   return invoices.value.filter(invoice => {
     const nameMatch = invoice.recipient_name.toLowerCase().includes(query);
@@ -158,149 +263,156 @@ const filteredInvoices = computed(() => {
 </script>
 
 <template>
-  <div class="dashboard">
-    <div class="page-header">
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
-        <h1>Invoices</h1>
-        <p class="subtitle">Manage and track your student invoices</p>
+        <h1 class="text-2xl sm:text-3xl font-extrabold font-heading text-text-primary tracking-tight">Invoices</h1>
+        <p class="text-sm sm:text-base text-text-secondary mt-1">Manage and track your student invoices</p>
       </div>
-      <div class="header-actions">
-        <router-link to="/sent-invoices" class="btn-secondary">
-          📧 Sent Log
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 ">
+        <router-link to="/sent-invoices"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 shadow-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition shadow-xs w-full sm:w-auto">
+          <Mail :size="16" />
+          <span>Sent Log</span>
         </router-link>
-        <button @click="fetchInvoices" class="btn-secondary" :disabled="loading">
-          {{ loading ? 'Updating...' : 'Refresh' }}
+        <button @click="fetchInvoices"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 shadow-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition shadow-xs disabled:opacity-60 w-full sm:w-auto"
+          :disabled="loading">
+          <RefreshCw :size="16" :class="{ 'animate-spin': loading }" />
+          <span>{{ loading ? 'Updating...' : 'Refresh' }}</span>
         </button>
-        <router-link to="/new" class="btn-primary">Create Invoice</router-link>
+        <router-link to="/new"
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 shadow-md bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition w-full sm:w-auto">
+          <Plus :size="16" stroke-width="2.5" />
+          <span>Create Invoice</span>
+        </router-link>
       </div>
     </div>
 
-    <div v-if="loading && invoices.length === 0" class="loading-state">
-      <div class="spinner"></div>
-      <p>Fetching invoices...</p>
+    <!-- Loading State -->
+    <div v-if="loading && invoices.length === 0"
+      class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-slate-200 text-text-secondary gap-3">
+      <Loader2 :size="36" class="animate-spin text-primary" />
+      <p class="text-sm font-medium">Fetching invoices...</p>
     </div>
 
-    <div v-else-if="error" class="error-container">
-      <div class="error-icon">!</div>
-      <p>{{ error }}</p>
-      <button @click="fetchInvoices" class="btn-secondary">Try Again</button>
+    <!-- Error State -->
+    <div v-else-if="error"
+      class="flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-2xl border border-red-200 shadow-xs gap-4">
+      <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+        <AlertCircle :size="24" />
+      </div>
+      <p class="text-red-700 font-medium text-sm sm:text-base max-w-md">{{ error }}</p>
+      <button @click="fetchInvoices"
+        class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+        <RefreshCw :size="16" />
+        <span>Try Again</span>
+      </button>
     </div>
 
-    <div v-else class="card table-card">
-      <div class="table-header">
-        <div class="search-box">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="M21 21l-4.35-4.35"/>
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search by name, email, or invoice number..."
-            class="search-input"
-          />
-          <button
-            v-if="searchQuery"
-            @click="searchQuery = ''"
-            class="clear-search"
-            title="Clear search"
-          >
-            &times;
+    <!-- Table Card -->
+    <div v-else class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <!-- Table Filter Bar -->
+      <div
+        class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 gap-3">
+        <div class="relative flex items-center flex-1 max-w-full sm:max-w-md">
+          <Search :size="18" class="absolute left-3 text-slate-400 pointer-events-none" />
+          <input v-model="searchQuery" type="text" placeholder="Search by name, email, or invoice number..."
+            class="w-full pl-9 pr-9 py-2 text-sm bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+          <button v-if="searchQuery" @click="searchQuery = ''"
+            class="absolute right-2.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-text-secondary flex items-center justify-center transition"
+            title="Clear search">
+            <X :size="12" />
           </button>
         </div>
-        <div class="results-count">
+        <div class="text-xs sm:text-sm text-text-secondary font-medium whitespace-nowrap">
           {{ filteredInvoices.length }} of {{ invoices.length }} invoices
         </div>
       </div>
-      <div class="table-wrapper">
-        <table v-if="filteredInvoices.length > 0">
-          <colgroup>
-            <col class="col-invoice" />
-            <col class="col-recipient" />
-            <col class="col-description" />
-            <col class="col-amount" />
-            <col class="col-status" />
-            <col class="col-recurring" />
-            <col class="col-date" />
-            <col class="col-actions" />
-          </colgroup>
+
+      <!-- Table View -->
+      <div class="overflow-x-auto">
+        <table v-if="filteredInvoices.length > 0" class="w-full border-collapse text-left text-sm min-w-[1150px]">
           <thead>
-            <tr>
-              <th>Invoice</th>
-              <th>Recipient</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Recurring</th>
-              <th>Date</th>
-              <th class="text-right">Actions</th>
+            <tr class="border-b border-slate-200 bg-slate-50/50">
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Invoice</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Recipient</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Description</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Amount</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Status</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Recurring</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary">Date</th>
+              <th class="px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-text-secondary text-right">Actions
+              </th>
             </tr>
           </thead>
-          <tbody>
-            <tr v-for="invoice in filteredInvoices" :key="invoice.id">
-              <td>
-                <span class="invoice-id">{{ invoice.invoice_number }}</span>
-              </td>
-              <td>
-                <div class="recipient-info">
-                  <span class="name">{{ invoice.recipient_name }}</span>
-                  <span class="email">{{ invoice.recipient_email }}</span>
-                </div>
-              </td>
-              <td class="description-cell">
-                {{ getDescriptionSummary(invoice) }}
-              </td>
-              <td>
-                <span class="amount-text">
-                  {{ invoice.currency }} {{ parseFloat(invoice.total_amount.toString()).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="invoice in filteredInvoices" :key="invoice.id" class="hover:bg-slate-50/80 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span
+                  class="inline-flex items-center font-numbers font-semibold text-xs px-2.5 py-1 rounded bg-slate-100 text-slate-800">
+                  {{ invoice.invoice_number }}
                 </span>
               </td>
-              <td>
-                <span :class="['status-pill', getStatusClass(invoice.status)]">
+              <td class="px-6 py-4">
+                <div class="flex flex-col">
+                  <span class="font-semibold text-text-primary text-sm whitespace-nowrap">{{ invoice.recipient_name
+                  }}</span>
+                  <span class="text-xs text-text-secondary whitespace-nowrap">{{ invoice.recipient_email }}</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 max-w-[280px] truncate text-slate-600 text-xs sm:text-sm">
+                {{ getDescriptionSummary(invoice) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="font-bold text-text-primary font-numbers text-sm">
+                  {{ invoice.currency }} {{ parseFloat(invoice.total_amount.toString()).toLocaleString(undefined, {
+                    minimumFractionDigits: 2
+                  }) }}
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
+                  :class="getStatusBadgeClass(invoice.status)">
                   {{ invoice.status }}
                 </span>
               </td>
-              <td>
-                <span v-if="getRecurringLabel(invoice)" :class="['recurring-pill', getRecurringClass(invoice)]">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span v-if="getRecurringLabel(invoice)"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+                  :class="getRecurringBadgeClass(invoice)">
                   {{ getRecurringLabel(invoice) }}
                 </span>
-                <span v-else class="no-recurring">—</span>
+                <span v-else class="text-slate-300 text-base leading-none select-none">—</span>
               </td>
-              <td class="date-cell">{{ formatDate(invoice.created_at) }}</td>
-              <td class="actions-cell">
-                <div class="actions-group">
-                  <button
-                    v-if="invoice.status === 'pending'"
-                    @click="markAsSent(invoice.id)"
-                    class="action-btn confirm"
-                    title="Mark as Sent"
-                  >
-                    Mark as Sent
+              <td class="px-6 py-4 whitespace-nowrap text-xs text-text-secondary">
+                {{ formatDate(invoice.created_at) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right">
+                <div class="inline-flex items-center justify-end gap-1.5">
+                  <button v-if="invoice.status === 'pending'" @click="confirmMarkAsSent(invoice)" data-tooltip="Send"
+                    class="group relative inline-flex items-center justify-center p-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold shadow-xs transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Send :size="15" />
                   </button>
-                  <button
-                    v-if="invoice.status === 'sent'"
-                    @click="resendInvoice(invoice.id)"
-                    class="action-btn resend"
-                    title="Resend Invoice"
-                  >
-                    Resend
+                  <button v-if="invoice.status === 'sent'" @click="resendInvoice(invoice.id)" :disabled="resendingId === invoice.id" data-tooltip="Resend"
+                    class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition disabled:opacity-50 before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Loader2 v-if="resendingId === invoice.id" :size="15" class="animate-spin text-primary" />
+                    <RotateCw v-else :size="15" />
                   </button>
-                  <router-link :to="'/edit/' + invoice.id" class="action-btn edit" title="Edit">
-                    Edit
+                  <router-link :to="'/edit/' + invoice.id" data-tooltip="Edit"
+                    class="group relative inline-flex items-center justify-center p-2 text-primary hover:bg-blue-50 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Pencil :size="15" />
                   </router-link>
-                  <button
-                    @click="downloadPdf(invoice.id, invoice.invoice_number)"
-                    class="action-btn view-pdf"
-                    title="View PDF"
-                  >
-                    View PDF
+                  <button @click="downloadPdf(invoice.id, invoice.invoice_number)" data-tooltip="PDF"
+                    class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <FileDown :size="15" />
                   </button>
                   <button
-                    @click="deleteInvoice(invoice.id, invoice.invoice_number, invoice.status, invoice.recipient_email, invoice.is_recurring)"
-                    class="action-btn delete"
-                    title="Delete"
-                  >
-                    Delete
+                    @click="confirmDeleteInvoice(invoice)"
+                    data-tooltip="Delete"
+                    class="group relative inline-flex items-center justify-center p-2 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Trash2 :size="15" />
                   </button>
                 </div>
               </td>
@@ -308,504 +420,150 @@ const filteredInvoices = computed(() => {
           </tbody>
         </table>
 
-        <div v-else class="empty-state">
-          <div class="empty-illustration">🔍</div>
-          <h3>No matching invoices found</h3>
-          <p v-if="searchQuery">No invoices match your search: "<strong>{{ searchQuery }}</strong>"</p>
-          <p v-else>No invoices yet. Create your first invoice to start tracking payments.</p>
-          <router-link v-if="!searchQuery" to="/new" class="btn-primary">Create First Invoice</router-link>
-          <button v-else @click="searchQuery = ''" class="btn-secondary">Clear Search</button>
+        <!-- Empty State -->
+        <div v-else class="flex flex-col items-center justify-center py-20 px-6 text-center">
+          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+            <SearchX v-if="searchQuery" :size="32" />
+            <Inbox v-else :size="32" />
+          </div>
+          <h3 class="text-base sm:text-lg font-bold text-slate-800 mb-1">
+            {{ searchQuery ? 'No matching invoices found' : 'No invoices yet' }}
+          </h3>
+          <p v-if="searchQuery" class="text-sm text-text-secondary mb-5 max-w-sm">
+            No invoices match your search: "<strong>{{ searchQuery }}</strong>"
+          </p>
+          <p v-else class="text-sm text-text-secondary mb-5 max-w-sm">
+            No invoices yet. Create your first invoice to start tracking payments.
+          </p>
+          <router-link v-if="!searchQuery" to="/new"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition">
+            <Plus :size="16" stroke-width="2.5" />
+            <span>Create First Invoice</span>
+          </router-link>
+          <button v-else @click="searchQuery = ''"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+            <X :size="16" />
+            <span>Clear Search</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send Confirmation Modal -->
+    <div v-if="showSendModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="!sending && (showSendModal = false)">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-full bg-blue-100 text-primary flex items-center justify-center shrink-0">
+            <Send :size="20" />
+          </div>
+          <div class="space-y-1 flex-1">
+            <h3 class="text-lg font-bold text-text-primary">Send Invoice</h3>
+            <p class="text-sm text-text-secondary">
+              Are you sure you want to mark invoice <strong class="text-slate-800 font-semibold font-numbers">{{ invoiceToSend?.invoice_number }}</strong> as sent?
+            </p>
+            <p class="text-xs text-text-secondary pt-1">
+              This will generate the official PDF and email it to <strong class="text-slate-800">{{ invoiceToSend?.recipient_email }}</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <button type="button" @click="showSendModal = false" :disabled="sending"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition disabled:opacity-50">
+            Cancel
+          </button>
+          <button type="button" @click="executeMarkAsSent" :disabled="sending"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
+            <Loader2 v-if="sending" :size="16" class="animate-spin shrink-0" />
+            <span>{{ sending ? 'Sending...' : 'Send Invoice' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="!deleting && (showDeleteModal = false)">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <Trash2 :size="22" />
+          </div>
+          <div class="space-y-2 flex-1">
+            <h3 class="text-lg font-bold text-text-primary">Delete Invoice</h3>
+            
+            <div v-if="invoiceToDelete?.status === 'sent'" class="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 space-y-1">
+              <p class="font-bold flex items-center gap-1.5">
+                <AlertTriangle :size="14" class="text-red-600 shrink-0" />
+                This invoice has already been sent
+              </p>
+              <p>Sent to: <strong>{{ invoiceToDelete?.recipient_email }}</strong></p>
+              <p v-if="invoiceToDelete?.is_recurring" class="font-semibold text-red-700">
+                This will also STOP future recurring invoices for this student.
+              </p>
+            </div>
+
+            <p class="text-sm text-text-secondary">
+              Are you sure you want to delete invoice <strong class="text-slate-800 font-semibold font-numbers">{{ invoiceToDelete?.invoice_number }}</strong>? This action cannot be undone.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <button type="button" @click="showDeleteModal = false" :disabled="deleting"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition disabled:opacity-50">
+            Cancel
+          </button>
+          <button type="button" @click="executeDeleteInvoice" :disabled="deleting"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
+            <Loader2 v-if="deleting" :size="16" class="animate-spin shrink-0" />
+            <span>{{ deleting ? 'Deleting...' : 'Delete Invoice' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert / Notification Modal -->
+    <div v-if="alertModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="closeAlert">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div v-if="alertModal.type === 'success'"
+            class="w-11 h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+            <CheckCircle2 :size="22" />
+          </div>
+          <div v-else-if="alertModal.type === 'error'"
+            class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <AlertCircle :size="22" />
+          </div>
+          <div v-else-if="alertModal.type === 'warning'"
+            class="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+            <AlertTriangle :size="22" />
+          </div>
+          <div v-else
+            class="w-11 h-11 rounded-full bg-blue-100 text-primary flex items-center justify-center shrink-0">
+            <Info :size="22" />
+          </div>
+          <div class="space-y-1 flex-1">
+            <h3 class="text-lg font-bold text-text-primary">{{ alertModal.title }}</h3>
+            <p class="text-sm text-text-secondary whitespace-pre-line leading-relaxed">{{ alertModal.message }}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end pt-2 border-t border-slate-100">
+          <button type="button" @click="closeAlert"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm transition">
+            Dismiss
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 2.5rem;
-}
-
-h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-  margin-bottom: 0.25rem;
-}
-
-.subtitle {
-  color: #64748b;
-  font-size: 1rem;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-/* Card Styling */
-.card {
-  background: white;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 280px;
-  max-width: 400px;
-  position: relative;
-}
-
-.search-icon {
-  width: 20px;
-  height: 20px;
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  padding: 0.625rem 1rem;
-  padding-left: 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  background: white;
-  transition: all 0.2s;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.search-input::placeholder {
-  color: #94a3b8;
-}
-
-.clear-search {
-  background: #f1f5f9;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #64748b;
-  font-size: 1.25rem;
-  line-height: 1;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.clear-search:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.results-count {
-  font-size: 0.875rem;
-  color: #64748b;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 1320px;
-}
-
-col.col-invoice { width: 160px; }
-col.col-recipient { width: 260px; }
-col.col-description { width: 280px; }
-col.col-amount { width: 180px; }
-col.col-status { width: 140px; }
-col.col-recurring { width: 220px; }
-col.col-date { width: 150px; }
-col.col-actions { width: 280px; }
-
-thead th:first-child {
-  padding-left: 1.75rem;
-}
-
-tbody td:first-child {
-  padding-left: 1.75rem;
-}
-
-th {
-  background: #f8fafc;
-  padding: 1rem 1.5rem;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-td {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover td {
-  background-color: #f8fafc;
-}
-
-/* Cell Content */
-.invoice-id {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 600;
-  color: #0f172a;
-  background: #f1f5f9;
-  padding: 0.375rem 0.625rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.recipient-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.name {
-  font-weight: 600;
-  color: #0f172a;
-  font-size: 0.9375rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.email {
-  display: block;
-  font-size: 0.8125rem;
-  color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.description-cell {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #475569;
-  font-size: 0.875rem;
-}
-
-.amount-text {
-  display: inline-block;
-  font-weight: 700;
-  color: #0f172a;
-  white-space: nowrap;
-}
-
-.date-cell {
-  color: #64748b;
-  font-size: 0.875rem;
-  white-space: nowrap;
-}
-
-/* Status Pills */
-.status-pill {
-  display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.status-sent {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.status-pending {
-  background: #fef9c3;
-  color: #a16207;
-}
-
-.status-cancelled {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.status-draft {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-/* Recurring Pills */
-.recurring-pill {
-  display: inline-flex;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.recurring-weekly { background: #dcfce7; color: #166534; }
-.recurring-monthly { background: #fef9c3; color: #854d0e; }
-.recurring-quarterly { background: #fed7aa; color: #9a3412; }
-.recurring-yearly { background: #e0e7ff; color: #3730a3; }
-
-.no-recurring {
-  color: #cbd5e1;
-  font-size: 1.25rem;
-}
-
-/* Actions */
-.actions-cell {
-  text-align: right;
-}
-
-.actions-group {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  white-space: nowrap;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.action-btn.confirm {
-  background: #2563eb;
-  color: white;
-}
-
-.action-btn.confirm:hover {
-  background: #1d4ed8;
-}
-
-.action-btn.resend {
-  border-color: #e2e8f0;
-  color: #475569;
-}
-
-.action-btn.resend:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.action-btn.edit {
-  color: #2563eb;
-  text-decoration: none;
-}
-
-.action-btn.edit:hover {
-  background: #eff6ff;
-}
-
-.action-btn.view-pdf {
-  color: #64748b;
-  border-color: #e2e8f0;
-}
-
-.action-btn.view-pdf:hover {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.action-btn.delete {
-  color: #ef4444;
-}
-
-.action-btn.delete:hover {
-  background: #fef2f2;
-}
-
-/* Empty State */
-.empty-state {
-  padding: 5rem 2rem;
-  text-align: center;
-}
-
-.empty-illustration {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-}
-
-.empty-state h3 {
-  margin-bottom: 0.5rem;
-}
-
-.empty-state p {
-  color: #64748b;
-  margin-bottom: 2rem;
-}
-
-.text-right { text-align: right; }
-
-@media (max-width: 960px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .header-actions {
-    flex-wrap: wrap;
-  }
-
-  .table-header {
-    align-items: stretch;
-  }
-
-  .search-box {
-    max-width: none;
-    width: 100%;
-  }
-
-  .results-count {
-    align-self: flex-start;
-  }
-}
-
-@media (max-width: 640px) {
-  h1 {
-    font-size: 1.625rem;
-  }
-
-  .header-actions {
-    width: 100%;
-  }
-
-  .header-actions > * {
-    width: 100%;
-    text-align: center;
-  }
-
-  .table-header {
-    padding: 1rem;
-  }
-
-  .search-box {
-    min-width: 0;
-  }
-
-  th,
-  td {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-}
-
-/* Dark Mode Overrides */
-@media (prefers-color-scheme: dark) {
-  .card {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  .table-header {
-    background: #1a2233;
-    border-color: #334155;
-  }
-  th {
-    background: #1a2233;
-    border-color: #334155;
-  }
-  td {
-    border-color: #334155;
-  }
-  .invoice-id {
-    background: #334155;
-    color: #f1f5f9;
-  }
-  .name, .amount-text { color: #f8fafc; }
-  tr:hover td { background-color: #1a2233; }
-  .action-btn.resend { border-color: #334155; color: #94a3b8; }
-  .action-btn.resend:hover { background: #334155; }
-  .search-input {
-    background: #1e293b;
-    border-color: #334155;
-    color: #f8fafc;
-  }
-  .search-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-  .search-input::placeholder {
-    color: #64748b;
-  }
-  .clear-search {
-    background: #334155;
-    color: #94a3b8;
-  }
-  .clear-search:hover {
-    background: #475569;
-    color: #f8fafc;
-  }
-  .results-count {
-    color: #94a3b8;
-  }
-  .action-btn.view-pdf {
-    border-color: #475569;
-    color: #cbd5e1;
-  }
-  .action-btn.view-pdf:hover {
-    background: #334155;
-    color: #f8fafc;
-  }
-}
-</style>

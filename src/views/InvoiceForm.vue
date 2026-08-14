@@ -1,6 +1,25 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import {
+  User,
+  Calendar,
+  Receipt,
+  ClipboardList,
+  Plus,
+  Trash2,
+  Sliders,
+  Info,
+  MessageSquare,
+  Calculator,
+  ArrowLeft,
+  Check,
+  Save,
+  Loader2,
+  X,
+  Layers,
+  Inbox,
+} from "lucide-vue-next";
 import api, { serviceTemplatesApi } from "../api";
 
 const router = useRouter();
@@ -123,17 +142,13 @@ const loadServiceTemplate = (template: {
   default_unit_price: number;
   currency: string;
 }) => {
-  // Update currency to match the template's currency
   form.value.currency = template.currency;
-
-  // Update the active item with template data
   const activeItem = form.value.items[activeItemIndex.value];
   if (activeItem) {
     activeItem.item_name = template.item_name;
     activeItem.description = template.description;
     activeItem.unit_price = Number(template.default_unit_price);
   }
-
   showTemplatesModal.value = false;
 };
 
@@ -155,7 +170,6 @@ const fetchInvoice = async () => {
     const data = response.data;
     const title = data.recipient_title || "";
 
-    // Check if it's a predefined title or custom
     const predefinedTitles = [
       "",
       "Mr",
@@ -256,9 +270,9 @@ const saveInvoice = async () => {
   } catch (err: any) {
     alert(
       "Error saving invoice: " +
-        (err.response?.data?.detail ||
-          JSON.stringify(err.response?.data) ||
-          err.message),
+      (err.response?.data?.detail ||
+        JSON.stringify(err.response?.data) ||
+        err.message),
     );
   } finally {
     saving.value = false;
@@ -272,37 +286,55 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="invoice-form-view">
-    <div class="page-header">
+  <div class="space-y-6">
+    <div>
+      <router-link to="/"
+        class="inline-flex items-center justify-center gap-2 py-2 text-secondary hover:text-secondary-dark active:text-secondary-base rounded-lg text-sm font-semibold transition w-full sm:w-auto">
+        <ArrowLeft :size="16" />
+        <span>Cancel</span>
+      </router-link>
+    </div>
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
       <div>
-        <h1>{{ isEdit ? "Edit Invoice" : "Create New Invoice" }}</h1>
-        <p class="subtitle">
+        <h1 class="text-2xl sm:text-3xl font-extrabold font-heading text-text-primary tracking-tight">
+          {{ isEdit ? "Edit Invoice" : "Create New Invoice" }}
+        </h1>
+        <p class="text-sm sm:text-base text-text-secondary mt-1">
           {{
             isEdit
-              ? "Update details for " + form.recipient_name
+              ? "Update details for " + (form.recipient_name || "invoice")
               : "Fill in the details to generate a new invoice"
           }}
         </p>
       </div>
-      <router-link to="/" class="btn-secondary">Cancel</router-link>
+      
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
-      <p>Loading details...</p>
+    <!-- Loading State -->
+    <div v-if="loading"
+      class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-slate-200 text-text-secondary gap-3">
+      <Loader2 :size="36" class="animate-spin text-primary" />
+      <p class="text-sm font-medium">Loading details...</p>
     </div>
 
-    <div v-else class="form-grid">
-      <div class="card form-card">
-        <form @submit.prevent="saveInvoice">
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Recipient Information</h3>
+    <!-- Main Grid -->
+    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-8 items-start">
+      <!-- Form Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <form @submit.prevent="saveInvoice" class="space-y-8">
+          <!-- Section 1: Recipient Information -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+             
+              <h3 class="text-base sm:text-lg font-bold text-text-primary">Recipient Information</h3>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Title</label>
-                <select v-model="form.recipient_title">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Title</label>
+                <select v-model="form.recipient_title"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition">
                   <option value="">None</option>
                   <option value="Mr">Mr</option>
                   <option value="Mrs">Mrs</option>
@@ -314,197 +346,180 @@ onMounted(() => {
                   <option value="custom">Custom...</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>Custom Title</label>
-                <input
-                  v-model="form.recipient_title_custom"
-                  type="text"
-                  :disabled="form.recipient_title !== 'custom'"
-                  placeholder="e.g. Alhaji, Barr., etc."
-                />
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Custom
+                  Title</label>
+                <input v-model="form.recipient_title_custom" type="text" :disabled="form.recipient_title !== 'custom'"
+                  placeholder="e.g. Alhaji, Barr."
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition disabled:opacity-50 disabled:bg-slate-100" />
               </div>
-              <div class="form-group">
-                <label>Recipient Name</label>
-                <input
-                  v-model="form.recipient_name"
-                  type="text"
-                  required
-                  placeholder="e.g. John Fakunle"
-                />
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Recipient Name
+                  *</label>
+                <input v-model="form.recipient_name" type="text" required placeholder="e.g. John Fakunle"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group" style="grid-column: span 3">
-                <label>Recipient Email</label>
-                <input
-                  v-model="form.recipient_email"
-                  type="email"
-                  required
-                  placeholder="customer@example.com"
-                />
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Recipient Email
+                *</label>
+              <input v-model="form.recipient_email" type="email" required placeholder="customer@example.com"
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+            </div>
+          </div>
+
+          <!-- Section 2: Invoice Dates -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+              
+              <h3 class="text-base sm:text-lg font-bold text-text-primary">Invoice Dates</h3>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Invoice
+                  Date</label>
+                <input v-model="form.invoice_date" type="date"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Due
+                  Date</label>
+                <input v-model="form.due_date" type="date"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
               </div>
             </div>
           </div>
 
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Invoice Dates</h3>
-            </div>
-            <div class="form-row-dates">
-              <div class="form-group">
-                <label>Invoice Date</label>
-                <input v-model="form.invoice_date" type="date" />
+          <!-- Section 3: Invoice Items -->
+          <div class="space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base sm:text-lg font-bold text-text-primary">Invoice Items</h3>
               </div>
-              <div class="form-group">
-                <label>Due Date</label>
-                <input v-model="form.due_date" type="date" />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Invoice Items</h3>
-              <div class="header-actions">
-                <button
-                  type="button"
-                  @click="showTemplatesModal = true"
-                  class="btn-text-secondary"
-                >
-                  📋 Load from Templates
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" @click="showTemplatesModal = true"
+                  class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-primary transition">
+                  <ClipboardList :size="14" />
+                  <span>Load from Templates</span>
                 </button>
-                <button type="button" @click="addItem" class="btn-text-primary">
-                  + Add Another Item
+                <button type="button" @click="addItem"
+                  class="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-dark transition">
+                  <Plus :size="14" />
+                  <span>Add Another Item</span>
                 </button>
               </div>
             </div>
 
-            <div class="items-list">
-              <div
-                v-for="(item, index) in form.items"
-                :key="index"
-                class="item-row card-sub"
-              >
-                <div class="item-main">
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Item Name *</label>
-                      <input
-                        v-model="item.item_name"
-                        type="text"
-                        required
-                        placeholder="e.g. Spanish Tutoring"
-                        @focus="setActiveItem(index)"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label>Unit Price</label>
-                      <div class="input-with-icon">
-                        <span class="currency-symbol">{{ form.currency }}</span>
-                        <input
-                          v-model.number="item.unit_price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          required
-                          placeholder="0.00"
-                          @focus="setActiveItem(index)"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label>Description</label>
-                    <textarea
-                      v-model="item.description"
-                      rows="2"
-                      placeholder="Detailed description of the item..."
+            <!-- Items List -->
+            <div class="space-y-4">
+              <div v-for="(item, index) in form.items" :key="index"
+                class="relative bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 space-y-4">
+                <!-- Remove item button -->
+                <button v-if="form.items.length > 1" type="button" @click="removeItem(index)"
+                  class="absolute top-3.5 right-3.5 w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition"
+                  title="Remove Item">
+                  <Trash2 :size="12" />
+                </button>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pr-6 sm:pr-8">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Item Name
+                      *</label>
+                    <input v-model="item.item_name" type="text" required placeholder="e.g. Spanish Tutoring"
                       @focus="setActiveItem(index)"
-                    ></textarea>
+                      class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
                   </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Duration Value</label>
-                      <input
-                        v-model.number="item.duration_value"
-                        type="number"
-                        min="1"
-                        required
-                        placeholder="e.g. 4"
-                      />
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Unit
+                      Price</label>
+                    <div class="relative flex items-center">
+                      <span class="absolute left-3 font-semibold text-slate-400 text-xs pointer-events-none">{{
+                        form.currency }}</span>
+                      <input v-model.number="item.unit_price" type="number" step="0.01" min="0" required
+                        placeholder="0.00" @focus="setActiveItem(index)"
+                        class="w-full pl-12 pr-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
                     </div>
-                    <div class="form-group">
-                      <label>Duration Unit (Optional)</label>
-                      <input
-                        v-model="item.duration_unit"
-                        type="text"
-                        list="duration-unit-options"
-                        placeholder="e.g. month, hour, session"
-                      />
-                    </div>
-                    <div class="form-group">
-                      <label>Discount (%)</label>
-                      <div class="input-with-icon">
-                        <input
-                          v-model.number="item.discount_percentage"
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="100"
-                          placeholder="0"
-                          @focus="setActiveItem(index)"
-                        />
-                        <span class="currency-symbol">%</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="item-total">
-                    <template v-if="(item.discount_percentage || 0) > 0">
-                      <span class="discount-breakdown">
-                        Original Fee: {{ form.currency }} {{ getItemOriginalPrice(item).toLocaleString(undefined, { minimumFractionDigits: 2 }) }} |
-                        Discount: {{ item.discount_percentage }}% (-{{ form.currency }} {{ getItemDiscountAmount(item).toLocaleString(undefined, { minimumFractionDigits: 2 }) }}) |
-                      </span>
-                    </template>
-                    <span>Final Fee: </span>
-                    <strong
-                      >{{ form.currency }}
-                      {{
-                        getItemTotalPrice(item).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                        })
-                      }}</strong
-                    >
                   </div>
                 </div>
-                <button
-                  v-if="form.items.length > 1"
-                  type="button"
-                  @click="removeItem(index)"
-                  class="btn-remove"
-                  title="Remove Item"
-                >
-                  &times;
-                </button>
+
+                <div>
+                  <label
+                    class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Description</label>
+                  <textarea v-model="item.description" rows="2" placeholder="Detailed description of the item..."
+                    @focus="setActiveItem(index)"
+                    class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Duration
+                      Value</label>
+                    <input v-model.number="item.duration_value" type="number" min="1" required placeholder="e.g. 4"
+                      class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Duration
+                      Unit (Optional)</label>
+                    <input v-model="item.duration_unit" type="text" list="duration-unit-options"
+                      placeholder="e.g. month, hour, session"
+                      class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Discount
+                      (%)</label>
+                    <div class="relative flex items-center">
+                      <input v-model.number="item.discount_percentage" type="number" step="0.1" min="0" max="100"
+                        placeholder="0" @focus="setActiveItem(index)"
+                        class="w-full pr-8 pl-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+                      <span class="absolute right-3 font-semibold text-slate-400 text-xs pointer-events-none">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Item calculation footer -->
+                <div
+                  class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-text-secondary">
+                  <div>
+                    <template v-if="(item.discount_percentage || 0) > 0">
+                      <span class="text-xs">
+                        Original: {{ form.currency }} {{ getItemOriginalPrice(item).toLocaleString(undefined, {
+                          minimumFractionDigits: 2
+                        }) }}
+                        &bull; Discount: {{ item.discount_percentage }}% (-{{ form.currency }} {{
+                          getItemDiscountAmount(item).toLocaleString(undefined, { minimumFractionDigits: 2 }) }})
+                      </span>
+                    </template>
+                  </div>
+                  <div class="font-semibold text-text-primary ml-auto">
+                    <span>Final Fee: </span>
+                    <span class="text-primary font-bold font-numbers">
+                      {{ form.currency }} {{ getItemTotalPrice(item).toLocaleString(undefined, {
+                        minimumFractionDigits:
+                          2
+                      }) }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
+
             <datalist id="duration-unit-options">
-              <option
-                v-for="unit in durationUnitSuggestions"
-                :key="unit"
-                :value="unit"
-              />
+              <option v-for="unit in durationUnitSuggestions" :key="unit" :value="unit" />
             </datalist>
           </div>
 
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Settings</h3>
+          <!-- Section 4: Settings -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+              <h3 class="text-base sm:text-lg font-bold text-text-primary">Settings</h3>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label>Currency</label>
-                <select v-model="form.currency">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Currency</label>
+                <select v-model="form.currency"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition">
                   <option value="USD">USD ($)</option>
                   <option value="NGN">NGN (₦)</option>
                   <option value="GBP">GBP (£)</option>
@@ -512,301 +527,238 @@ onMounted(() => {
                   <option value="CAD">CAD (C$)</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>Status</label>
-                <select v-model="form.status">
-                  <option value="pending">
-                    Pending (Awaiting Confirmation)
-                  </option>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Status</label>
+                <select v-model="form.status"
+                  class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition">
+                  <option value="pending">Pending (Awaiting Confirmation)</option>
                   <option value="draft">Save as Draft</option>
                 </select>
               </div>
             </div>
 
-            <!-- Tax Toggle - Only for CAD and USD -->
-            <div
-              class="tax-toggle"
-              v-if="['CAD', 'USD'].includes(form.currency)"
-            >
-              <div class="toggle-info">
-                <label class="toggle-label">Include Taxes (GST)</label>
-                <p class="toggle-desc">
-                  Add GST percentage to the invoice total
-                </p>
+            <!-- Tax Toggle (CAD/USD) -->
+            <div v-if="['CAD', 'USD'].includes(form.currency)"
+              class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div>
+                <div class="font-semibold text-sm text-slate-800">Include Taxes (GST)</div>
+                <div class="text-xs text-text-secondary">Add GST percentage to the invoice total</div>
               </div>
-              <label class="switch">
-                <input type="checkbox" v-model="form.include_tax" />
-                <span class="slider round"></span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="form.include_tax" class="sr-only peer" />
+                <div
+                  class="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/20 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary rounded-full">
+                </div>
               </label>
             </div>
 
-            <div v-if="form.include_tax" class="tax-options animate-fade-in">
-              <div class="form-group">
-                <label>GST Percentage (%)</label>
-                <input
-                  v-model.number="form.tax_percentage"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  placeholder="e.g. 5"
-                />
-                <p class="help-text">
-                  Standard GST rate is 5% for Canada and varies for US.
-                </p>
-              </div>
+            <!-- Tax Options Input -->
+            <div v-if="form.include_tax" class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">GST Percentage
+                (%)</label>
+              <input v-model.number="form.tax_percentage" type="number" step="0.01" min="0" max="100"
+                placeholder="e.g. 5"
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+              <p class="text-xs text-text-secondary">Standard GST rate is 5% for Canada and varies for US.</p>
             </div>
 
-            <div class="recurring-toggle">
-              <div class="toggle-info">
-                <label class="toggle-label">Recurring Invoice</label>
-                <p class="toggle-desc">
-                  Automatically repeat this invoice on a schedule
-                </p>
+            <!-- Recurring Toggle -->
+            <div class="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div>
+                <div class="font-semibold text-sm text-slate-800">Recurring Invoice</div>
+                <div class="text-xs text-text-secondary">Automatically repeat this invoice on a schedule</div>
               </div>
-              <label class="switch">
-                <input type="checkbox" v-model="form.is_recurring" />
-                <span class="slider round"></span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="form.is_recurring" class="sr-only peer" />
+                <div
+                  class="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/20 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary rounded-full">
+                </div>
               </label>
             </div>
 
-            <div
-              v-if="form.is_recurring"
-              class="recurrence-options animate-fade-in"
-            >
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Frequency</label>
-                  <div class="radio-group">
-                    <label
-                      class="radio-card"
-                      :class="{ active: form.recurrence_interval === 'weekly' }"
-                    >
-                      <input
-                        type="radio"
-                        v-model="form.recurrence_interval"
-                        value="weekly"
-                      />
-                      <span>Weekly</span>
-                    </label>
-                    <label
-                      class="radio-card"
-                      :class="{
-                        active: form.recurrence_interval === 'monthly',
-                      }"
-                    >
-                      <input
-                        type="radio"
-                        v-model="form.recurrence_interval"
-                        value="monthly"
-                      />
-                      <span>Monthly</span>
-                    </label>
-                    <label
-                      class="radio-card"
-                      :class="{
-                        active: form.recurrence_interval === 'quarterly',
-                      }"
-                    >
-                      <input
-                        type="radio"
-                        v-model="form.recurrence_interval"
-                        value="quarterly"
-                      />
-                      <span>Quarterly</span>
-                    </label>
-                    <label
-                      class="radio-card"
-                      :class="{ active: form.recurrence_interval === 'yearly' }"
-                    >
-                      <input
-                        type="radio"
-                        v-model="form.recurrence_interval"
-                        value="yearly"
-                      />
-                      <span>Yearly</span>
-                    </label>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>Next Invoice Date *</label>
-                  <input
-                    v-model="form.next_invoice_date"
-                    type="date"
-                    required
-                  />
-                  <p class="help-text">
-                    The date when the next invoice will be automatically
-                    generated and sent.
-                  </p>
-                </div>
-                <div class="form-group">
-                  <label>End Date (Optional)</label>
-                  <input v-model="form.recurring_end_date" type="date" />
-                  <p class="help-text">
-                    Recurring will stop after this date. Leave empty for
-                    indefinite.
-                  </p>
+            <!-- Recurrence Options -->
+            <div v-if="form.is_recurring" class="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+              <div>
+                <label
+                  class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Frequency</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <label v-for="freq in ['weekly', 'monthly', 'quarterly', 'yearly']" :key="freq"
+                    class="flex items-center justify-center p-2.5 rounded-lg border text-xs font-semibold cursor-pointer transition capitalize text-center"
+                    :class="form.recurrence_interval === freq ? 'border-primary bg-blue-50 text-primary ring-1 ring-primary' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'">
+                    <input type="radio" v-model="form.recurrence_interval" :value="freq" class="sr-only" />
+                    <span>{{ freq }}</span>
+                  </label>
                 </div>
               </div>
-              <div class="recurring-note">
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Next Invoice
+                    Date
+                    *</label>
+                  <input v-model="form.next_invoice_date" type="date" required
+                    class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+                  <p class="text-xs text-text-secondary mt-1">Date when next invoice will be generated.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">End Date
+                    (Optional)</label>
+                  <input v-model="form.recurring_end_date" type="date"
+                    class="w-full px-3.5 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition" />
+                  <p class="text-xs text-text-secondary mt-1">Recurring will stop after this date.</p>
+                </div>
+              </div>
+
+              <div
+                class="flex items-start gap-2.5 p-3.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
+                <Info :size="16" class="shrink-0 mt-0.5 text-primary" />
                 <p>
-                  ℹ️ A new invoice will be automatically generated and sent on
-                  the Next Invoice Date. Subsequent invoices will be created
-                  every <strong>{{ form.recurrence_interval }}</strong> until
-                  the End Date (or indefinitely if no end date is set).
+                  A new invoice will be generated and sent on the Next Invoice Date, repeating
+                  every <strong>{{ form.recurrence_interval }}</strong> until the End Date (or indefinitely).
                 </p>
               </div>
             </div>
           </div>
 
-          <div class="form-section">
-            <div class="section-header">
-              <h3>Notes (Optional)</h3>
+          <!-- Section 5: Notes -->
+          <div class="space-y-4">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+              <h3 class="text-base sm:text-lg font-bold text-text-primary">Notes (Optional)</h3>
             </div>
-            <div class="form-group">
-              <label>Short Note for Invoice</label>
-              <textarea
-                v-model="form.notes"
-                rows="4"
-                maxlength="500"
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Short Note for
+                Invoice</label>
+              <textarea v-model="form.notes" rows="3" maxlength="500" 
                 placeholder="Add a short note to include on the invoice (max 500 characters). This will appear below the items table in the PDF."
-              />
-              <p class="help-text">
-                This note will be displayed on the PDF invoice below the items
-                table.
-              </p>
+                class="w-full px-3.5 py-2 text-sm border border-slate-300 min-h-[4.5rem] rounded-lg bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-blue-500/20 transition"></textarea>
+              <p class="text-xs text-text-secondary mt-1">This note will appear on the PDF invoice below the items
+                table.</p>
             </div>
           </div>
 
-          <div class="form-footer">
-            <button
-              type="button"
-              @click="router.push('/')"
-              class="btn-secondary"
-            >
-              Cancel
-            </button>
-            <button type="submit" class="btn-primary" :disabled="saving">
-              {{
+          <!-- Form Action Buttons -->
+          <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-6 border-t border-slate-200">
+            <router-link to="/"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition">
+              <ArrowLeft :size="16" />
+              <span>Cancel</span>
+            </router-link>
+            <button type="submit"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="saving">
+              <Loader2 v-if="saving" :size="16" class="animate-spin shrink-0" />
+              <span>{{
                 saving
                   ? "Processing..."
                   : isEdit
                     ? "Update Invoice"
                     : "Generate Invoice"
-              }}
+              }}</span>
             </button>
           </div>
         </form>
       </div>
 
-      <div class="card preview-card">
-        <h3>Summary</h3>
-        <div class="preview-content">
-          <div class="preview-item">
-            <span class="label">Subtotal</span>
-            <span class="value"
-              >{{ form.currency }}
-              {{
-                subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })
-              }}</span
-            >
+      <!-- Preview / Summary Card -->
+      <div class="lg:sticky lg:top-24 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+        <div class="flex items-center gap-2 pb-3 border-b border-slate-200">
+          <h3 class="text-base font-bold text-text-primary">Summary</h3>
+        </div>
+
+        <div class="space-y-3.5 text-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Subtotal</span>
+            <span class="font-semibold text-slate-800 font-numbers">
+              {{ form.currency }} {{ subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+            </span>
           </div>
-          <div
-            v-if="form.include_tax && form.tax_percentage > 0"
-            class="preview-item"
-          >
-            <span class="label">Tax ({{ form.tax_percentage }}%)</span>
-            <span class="value"
-              >{{ form.currency }}
-              {{
-                taxAmount.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                })
-              }}</span
-            >
+
+          <div v-if="form.include_tax && form.tax_percentage > 0" class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Tax ({{ form.tax_percentage
+              }}%)</span>
+            <span class="font-semibold text-slate-800 font-numbers">
+              {{ form.currency }} {{ taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+            </span>
           </div>
-          <hr />
-          <div class="preview-item">
-            <span class="label">Total Amount</span>
-            <span class="value big"
-              >{{ form.currency }}
-              {{
-                totalAmount.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                })
-              }}</span
-            >
+
+          <div class="pt-3 border-t border-slate-200">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs font-bold uppercase text-slate-400 tracking-wider">Total Amount</span>
+              <span class="text-xl sm:text-2xl font-extrabold text-primary font-numbers">
+                {{ form.currency }} {{ totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) }}
+              </span>
+            </div>
           </div>
-          <hr />
-          <div class="preview-item">
-            <span class="label">Recipient</span>
-            <span class="value">{{ form.recipient_name || "---" }}</span>
-          </div>
-          <div class="preview-item">
-            <span class="label">Line Items</span>
-            <span class="value">{{ form.items.length }} item(s)</span>
-          </div>
-          <div class="preview-item">
-            <span class="label">Schedule</span>
-            <span class="value">{{
-              form.is_recurring
-                ? "Recurring " + form.recurrence_interval
-                : "One-time payment"
-            }}</span>
+
+          <div class="pt-3 border-t border-slate-200 space-y-2 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-text-secondary">Recipient</span>
+              <span class="font-medium text-slate-800 truncate max-w-[150px]">{{ form.recipient_name || "—" }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-text-secondary">Line Items</span>
+              <span class="font-medium text-slate-800">{{ form.items.length }} item(s)</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-text-secondary">Schedule</span>
+              <span class="font-medium text-slate-800 capitalize">
+                {{ form.is_recurring ? "Recurring " + form.recurrence_interval : "One-time payment" }}
+              </span>
+            </div>
           </div>
         </div>
-        <div class="preview-note">
-          <p>
-            ℹ️ PDF will be generated and emailed when you mark the invoice as
-            sent from the dashboard.
-          </p>
+
+        <div
+          class="flex items-start gap-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+          <Info :size="16" class="shrink-0 mt-0.5 text-primary" />
+          <p>PDF will be generated and emailed when you mark the invoice as sent from the dashboard.</p>
         </div>
       </div>
     </div>
 
     <!-- Service Templates Modal -->
-    <div
-      v-if="showTemplatesModal"
-      class="modal-overlay"
-      @click.self="showTemplatesModal = false"
-    >
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Select Service Template</h2>
-          <button @click="showTemplatesModal = false" class="btn-close">
-            &times;
+    <div v-if="showTemplatesModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="showTemplatesModal = false">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between p-5 border-b border-slate-200">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-bold text-text-primary">Select Service Template</h2>
+          </div>
+          <button @click="showTemplatesModal = false"
+            class="w-8 h-8 rounded-lg text-text-secondary hover:bg-slate-100 flex items-center justify-center transition"
+            title="Close">
+            <X :size="18" />
           </button>
         </div>
-        <div class="modal-body">
-          <div v-if="serviceTemplates.length === 0" class="empty-state">
-            <p>No service templates available.</p>
+
+        <div class="p-5 overflow-y-auto space-y-3">
+          <div v-if="serviceTemplates.length === 0"
+            class="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+            <Inbox :size="36" class="mb-2" />
+            <p class="text-sm">No service templates available.</p>
           </div>
-          <div v-else class="templates-list">
-            <div
-              v-for="template in serviceTemplates"
-              :key="template.id"
-              class="template-item"
-              @click="loadServiceTemplate(template)"
-            >
-              <div class="template-info">
-                <div>
-                  <strong>{{ template.item_name }}</strong>
-                  <span class="template-currency">{{ template.currency }}</span>
+          <div v-else class="space-y-2.5">
+            <div v-for="template in serviceTemplates" :key="template.id" @click="loadServiceTemplate(template)"
+              class="p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer transition space-y-1">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <strong class="text-sm font-bold text-text-primary">{{ template.item_name }}</strong>
+                  <span
+                    class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                    {{ template.currency }}
+                  </span>
                 </div>
-                <div class="template-price">
-                  {{ template.currency }}
-                  {{
-                    Number(template.default_unit_price).toLocaleString(
-                      undefined,
-                      { minimumFractionDigits: 2 },
-                    )
-                  }}
-                </div>
-                <p v-if="template.description" class="template-description">
-                  {{ template.description }}
-                </p>
+                <span class="font-bold text-primary text-sm">
+                  {{ template.currency }} {{ Number(template.default_unit_price).toLocaleString(undefined, {
+                    minimumFractionDigits: 2
+                  }) }}
+                </span>
               </div>
+              <p v-if="template.description" class="text-xs text-text-secondary line-clamp-2">
+                {{ template.description }}
+              </p>
             </div>
           </div>
         </div>
@@ -814,551 +766,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 2.5rem;
-}
-h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  margin-bottom: 0.25rem;
-}
-.subtitle {
-  color: #64748b;
-  margin: 0;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 2rem;
-  align-items: start;
-}
-.card {
-  background: white;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  padding: 2rem;
-}
-.form-section {
-  margin-bottom: 2.5rem;
-}
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-h3 {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
-}
-
-.items-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.card-sub {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  position: relative;
-}
-.item-row {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-.item-main {
-  flex-grow: 1;
-}
-.item-total {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #e2e8f0;
-  font-size: 0.875rem;
-  color: #64748b;
-}
-
-.btn-remove {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: none;
-  background: #fee2e2;
-  color: #b91c1c;
-  font-size: 1.25rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-.btn-remove:hover {
-  background: #fecaca;
-  transform: scale(1.1);
-}
-
-.btn-text-primary {
-  background: none;
-  border: none;
-  color: #2563eb;
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-.btn-text-primary:hover {
-  text-decoration: underline;
-}
-.btn-text-secondary {
-  background: none;
-  border: none;
-  color: #475569;
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-.btn-text-secondary:hover {
-  text-decoration: underline;
-}
-
-.form-group {
-  margin-bottom: 1.25rem;
-}
-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 0.5rem;
-}
-
-input[type="text"],
-input[type="email"],
-input[type="number"],
-textarea,
-select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 1rem;
-}
-.form-row-dates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-.form-row-dates .form-group {
-  margin-bottom: 0;
-}
-.input-with-icon {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.currency-symbol {
-  position: absolute;
-  left: 0.75rem;
-  font-weight: 700;
-  color: #94a3b8;
-  font-size: 0.875rem;
-}
-.input-with-icon input {
-  padding-left: 2.5rem;
-}
-
-.help-text {
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-top: 0.25rem;
-}
-
-.recurring-note {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-top: 1rem;
-}
-.recurring-note p {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: #1e40af;
-}
-
-.tax-toggle,
-.recurring-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #f8fafc;
-  padding: 1.25rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e2e8f0;
-  margin-top: 1rem;
-}
-.toggle-desc {
-  font-size: 0.8125rem;
-  color: #64748b;
-  margin: 0;
-}
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.slider {
-  position: absolute;
-  cursor: pointer;
-  inset: 0;
-  background-color: #cbd5e1;
-  transition: 0.4s;
-  border-radius: 24px;
-}
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-input:checked + .slider {
-  background-color: #2563eb;
-}
-input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-.tax-options {
-  background: #f8fafc;
-  padding: 1.25rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e2e8f0;
-  margin-top: 1rem;
-}
-
-.radio-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-.radio-card {
-  border: 1px solid #e2e8f0;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  text-align: center;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #64748b;
-}
-.radio-card input {
-  display: none;
-}
-.radio-card.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #2563eb;
-}
-
-.form-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 3rem;
-  padding-top: 2rem;
-  border-top: 1px solid #f1f5f9;
-}
-.preview-card {
-  position: sticky;
-  top: 100px;
-  background: #f8fafc;
-  border-style: dashed;
-}
-.preview-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 1.25rem;
-}
-.preview-item .label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-}
-.preview-item .value {
-  font-weight: 600;
-  color: #0f172a;
-}
-.preview-item .value.big {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #2563eb;
-}
-hr {
-  border: 0;
-  border-top: 1px solid #e2e8f0;
-  margin: 1.5rem 0;
-}
-.preview-note {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: #fff;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
-  font-size: 0.8125rem;
-  color: #475569;
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: white;
-  border-radius: 1rem;
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-.modal-header h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0;
-}
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #64748b;
-}
-.templates-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.template-item {
-  padding: 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.template-item:hover {
-  background: #f8fafc;
-  border-color: #2563eb;
-}
-.template-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.template-currency {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.125rem 0.5rem;
-  background: #f1f5f9;
-  border-radius: 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #475569;
-}
-.template-price {
-  font-weight: 700;
-  color: #2563eb;
-  font-size: 0.9375rem;
-}
-.template-description {
-  font-size: 0.8125rem;
-  color: #64748b;
-  margin: 0.25rem 0 0 0;
-}
-
-@media (max-width: 1024px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .preview-card {
-    position: static;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-header,
-  .section-header,
-  .tax-toggle,
-  .recurring-toggle,
-  .form-footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .page-header,
-  .section-header {
-    gap: 1rem;
-  }
-
-  .header-actions {
-    flex-wrap: wrap;
-  }
-
-  .card {
-    padding: 1.25rem;
-  }
-
-  .card-sub {
-    padding: 1.25rem 1rem 1rem;
-  }
-
-  .form-row,
-  .form-row-dates,
-  .radio-group {
-    grid-template-columns: 1fr;
-  }
-
-  .item-row {
-    display: block;
-  }
-
-  .item-main {
-    width: 100%;
-  }
-
-  .btn-remove {
-    top: 0.75rem;
-    right: 0.75rem;
-  }
-
-  .toggle-info {
-    margin-bottom: 0.75rem;
-  }
-
-  .form-footer .btn-primary,
-  .form-footer .btn-secondary {
-    width: 100%;
-  }
-
-  .modal-content {
-    width: calc(100% - 1rem);
-    padding: 1.25rem;
-    max-height: 88vh;
-  }
-}
-
-@media (max-width: 480px) {
-  h1 {
-    font-size: 1.625rem;
-  }
-
-  .btn-text-primary,
-  .btn-text-secondary {
-    width: 100%;
-    text-align: left;
-    padding: 0.5rem 0;
-  }
-
-  .preview-item .value.big {
-    font-size: 1.25rem;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .card {
-    background: #1e293b;
-    border-color: #334155;
-  }
-  .preview-card {
-    background: #1a2233;
-  }
-  h3,
-  .preview-item .value {
-    color: #f8fafc;
-  }
-  input,
-  textarea,
-  select {
-    background: #0f172a;
-    border-color: #334155;
-    color: #f1f5f9;
-  }
-  .card-sub,
-  .recurring-toggle,
-  .preview-note,
-  .tax-toggle,
-  .tax-options {
-    background: #0f172a;
-    border-color: #334155;
-  }
-  .radio-card {
-    border-color: #334155;
-  }
-  .modal-content {
-    background: #1e293b;
-  }
-  .template-item {
-    border-color: #334155;
-  }
-  .template-item:hover {
-    background: #0f172a;
-  }
-}
-</style>
