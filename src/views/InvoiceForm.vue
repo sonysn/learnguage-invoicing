@@ -2,23 +2,13 @@
 import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import {
-  User,
-  Calendar,
-  Receipt,
   ClipboardList,
   Plus,
   Trash2,
-  Sliders,
   Info,
-  MessageSquare,
-  Calculator,
   ArrowLeft,
-  Check,
-  Save,
   Loader2,
-  X,
-  Layers,
-  Inbox,
+  X
 } from "lucide-vue-next";
 import api, { serviceTemplatesApi } from "../api";
 
