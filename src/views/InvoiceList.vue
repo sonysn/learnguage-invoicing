@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import {
   Mail,
   RefreshCw,
@@ -18,6 +18,8 @@ import {
   SearchX,
   Inbox,
   Loader2,
+  FileCheck2,
+  FileText
 } from 'lucide-vue-next';
 import api from '../api';
 
@@ -33,6 +35,11 @@ interface Invoice {
   is_recurring: boolean;
   recurrence_interval: string;
   next_invoice_date: string | null;
+  invoice_made?: boolean;
+  receipt_made?: boolean;
+  message?: string | null;
+  error_message?: string | null;
+  task_id?: string | null;
   items: Array<{ item_name?: string; description?: string; discount_percentage?: number }>;
 }
 
@@ -40,6 +47,15 @@ const invoices = ref<Invoice[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const searchQuery = ref('');
+
+// Pending asynchronous operations tracked by Celery task ID
+const pendingTaskIds = ref<string[]>([]);
+const pollingInterval = ref<any>(null);
+
+const isTaskPending = (taskId?: string | null) => {
+  if (!taskId) return false;
+  return pendingTaskIds.value.includes(taskId);
+};
 
 const showDeleteModal = ref(false);
 const invoiceToDelete = ref<{
@@ -60,6 +76,10 @@ const invoiceToSend = ref<{
 } | null>(null);
 const sending = ref(false);
 const resendingId = ref<number | null>(null);
+
+const showReceiptModal = ref(false);
+const invoiceForReceipt = ref<Invoice | null>(null);
+const sendingReceipt = ref(false);
 
 const alertModal = ref<{
   show: boolean;
@@ -100,6 +120,83 @@ const fetchInvoices = async () => {
   }
 };
 
+const pollInvoiceStatus = async () => {
+  if (pendingTaskIds.value.length === 0) {
+    stopPolling();
+    return;
+  }
+
+  try {
+    const response = await api.post('/invoices/invoice_status/', {
+      task_ids: pendingTaskIds.value
+    });
+
+    const results = response.data;
+    if (Array.isArray(results) && results.length > 0) {
+      let shouldRefetch = false;
+
+      for (const res of results) {
+        if (!res || !res.task_id) continue;
+
+        // Remove resolved task_id from pending tracking
+        pendingTaskIds.value = pendingTaskIds.value.filter(id => id !== res.task_id);
+
+        // Update user on the result
+        const isSuccess = res.success ?? (res.status === 'success');
+        const taskType = res.type === 'receipt' ? 'Receipt' : 'Invoice';
+        const title = isSuccess 
+          ? `${taskType} Sent Successfully` 
+          : `${taskType} Delivery Failed`;
+        const alertType = isSuccess ? 'success' : 'error';
+        const msg = res.message || (isSuccess ? `${taskType} processed successfully.` : `${taskType} processing failed.`);
+
+        showAlert(msg, title, alertType);
+        shouldRefetch = true;
+      }
+
+      if (shouldRefetch) {
+        await fetchInvoices();
+      }
+
+      if (pendingTaskIds.value.length === 0) {
+        stopPolling();
+      }
+    }
+  } catch (err: any) {
+    console.error('Error polling invoice status:', err);
+  }
+};
+
+const startPolling = () => {
+  if (!pollingInterval.value) {
+    pollingInterval.value = setInterval(pollInvoiceStatus, 2500);
+  }
+};
+
+const stopPolling = () => {
+  if (pollingInterval.value) {
+    clearInterval(pollingInterval.value);
+    pollingInterval.value = null;
+  }
+};
+
+onMounted(async () => {
+  await fetchInvoices();
+  // Check for any ongoing background tasks on mount
+  const activeTasks = invoices.value
+    .filter(inv => inv.task_id && !inv.message && (inv.status === 'sent' && !inv.invoice_made))
+    .map(inv => inv.task_id as string);
+
+  if (activeTasks.length > 0) {
+    pendingTaskIds.value = Array.from(new Set([...pendingTaskIds.value, ...activeTasks]));
+    startPolling();
+  }
+});
+
+onUnmounted(() => {
+  stopPolling();
+});
+
 const confirmMarkAsSent = (invoice: Invoice) => {
   invoiceToSend.value = {
     id: invoice.id,
@@ -112,14 +209,27 @@ const confirmMarkAsSent = (invoice: Invoice) => {
 
 const executeMarkAsSent = async () => {
   if (!invoiceToSend.value) return;
+  const sentId = invoiceToSend.value.id;
+  const sentNumber = invoiceToSend.value.invoice_number;
 
   try {
     sending.value = true;
-    await api.post(`/invoices/${invoiceToSend.value.id}/mark_as_sent/`);
+    const response = await api.post(`/invoices/${sentId}/mark_as_sent/`);
+
     showSendModal.value = false;
     invoiceToSend.value = null;
+
+    const taskId = response.data?.task_id;
+    if (taskId && !pendingTaskIds.value.includes(taskId)) {
+      pendingTaskIds.value.push(taskId);
+    }
+    startPolling();
+    showAlert(
+      `Invoice ${sentNumber} is queued for sending. We will notify you once completed.`,
+      'Invoice Queued',
+      'info'
+    );
     await fetchInvoices();
-    showAlert('Invoice marked as sent and emailed to the student.', 'Invoice Sent', 'success');
   } catch (err: any) {
     showSendModal.value = false;
     showAlert('Error: ' + (err.response?.data?.detail || err.message), 'Send Failed', 'error');
@@ -131,12 +241,58 @@ const executeMarkAsSent = async () => {
 const resendInvoice = async (id: number) => {
   try {
     resendingId.value = id;
-    await api.post(`/invoices/${id}/resend_invoice/`);
-    showAlert('Invoice resent successfully!', 'Success', 'success');
+    const response = await api.post(`/invoices/${id}/resend_invoice/`);
+    const taskId = response.data?.task_id;
+    if (taskId && !pendingTaskIds.value.includes(taskId)) {
+      pendingTaskIds.value.push(taskId);
+    }
+    startPolling();
+    showAlert(
+      'Invoice has been queued to be resent in the background.',
+      'Resend Queued',
+      'info'
+    );
+    await fetchInvoices();
   } catch (err: any) {
     showAlert('Error: ' + (err.response?.data?.detail || err.message), 'Resend Failed', 'error');
   } finally {
     resendingId.value = null;
+  }
+};
+
+const confirmCreateReceipt = (invoice: Invoice) => {
+  invoiceForReceipt.value = invoice;
+  showReceiptModal.value = true;
+};
+
+const executeCreateReceipt = async () => {
+  if (!invoiceForReceipt.value) return;
+  const targetId = invoiceForReceipt.value.id;
+  const targetNumber = invoiceForReceipt.value.invoice_number;
+  const targetEmail = invoiceForReceipt.value.recipient_email;
+
+  try {
+    sendingReceipt.value = true;
+    const response = await api.post(`/invoices/${targetId}/create_receipt/`);
+    showReceiptModal.value = false;
+    invoiceForReceipt.value = null;
+
+    const taskId = response.data?.task_id;
+    if (taskId && !pendingTaskIds.value.includes(taskId)) {
+      pendingTaskIds.value.push(taskId);
+    }
+    startPolling();
+    showAlert(
+      `Payment receipt for invoice ${targetNumber} is being generated and emailed to ${targetEmail} in the background.`,
+      'Receipt Queued',
+      'info'
+    );
+    await fetchInvoices();
+  } catch (err: any) {
+    showReceiptModal.value = false;
+    showAlert('Error queuing receipt: ' + (err.response?.data?.detail || err.message), 'Receipt Failed', 'error');
+  } finally {
+    sendingReceipt.value = false;
   }
 };
 
@@ -186,7 +342,25 @@ const downloadPdf = async (id: number, number: string) => {
   }
 };
 
-onMounted(fetchInvoices);
+const downloadReceipt = async (id: number, number: string) => {
+  try {
+    const response = await api.get(`/invoices/${id}/download_receipt_pdf/`, {
+      responseType: 'blob'
+    });
+    const url = window.URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url;
+    const rawInv = String(number || '');
+    const recNo = rawInv.startsWith('INV-') ? `REC-${rawInv.replace('INV-', '')}` : `REC-${rawInv}`;
+    link.setAttribute('download', `Receipt_${recNo}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (err: any) {
+    showAlert('Error downloading PDF: ' + err.message, 'Download Failed', 'error');
+  }
+};
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -373,7 +547,22 @@ const filteredInvoices = computed(() => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
+                <span v-if="isTaskPending(invoice.task_id)"
+                  class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse">
+                  <Loader2 :size="12" class="animate-spin text-blue-600" />
+                  Processing...
+                </span>
+                <div v-else-if="invoice.message || invoice.error_message" class="inline-flex items-center gap-1.5">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize bg-red-100 text-red-800">
+                    Failed
+                  </span>
+                  <button @click="showAlert(invoice.message || invoice.error_message || '', 'Delivery Error', 'error')"
+                    title="Click to view error details"
+                    class="text-red-500 hover:text-red-700 transition">
+                    <AlertCircle :size="15" />
+                  </button>
+                </div>
+                <span v-else class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
                   :class="getStatusBadgeClass(invoice.status)">
                   {{ invoice.status }}
                 </span>
@@ -391,23 +580,49 @@ const filteredInvoices = computed(() => {
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right">
                 <div class="inline-flex items-center justify-end gap-1.5">
-                  <button v-if="invoice.status === 'pending'" @click="confirmMarkAsSent(invoice)" data-tooltip="Send"
-                    class="group relative inline-flex items-center justify-center p-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold shadow-xs transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
-                    <Send :size="15" />
+                  <!-- Send (Pending) -->
+                  <button v-if="invoice.status === 'pending'" @click="confirmMarkAsSent(invoice)"
+                    :disabled="isTaskPending(invoice.task_id)" data-tooltip="Send Invoice"
+                    class="group relative inline-flex items-center justify-center p-2 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-semibold shadow-xs transition disabled:opacity-50 before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Loader2 v-if="isTaskPending(invoice.task_id)" :size="15" class="animate-spin text-white" />
+                    <Send v-else :size="15" />
                   </button>
-                  <button v-if="invoice.status === 'sent'" @click="resendInvoice(invoice.id)" :disabled="resendingId === invoice.id" data-tooltip="Resend"
+
+                  <!-- Resend (Sent) -->
+                  <button v-if="invoice.status === 'sent'" @click="resendInvoice(invoice.id)"
+                    :disabled="resendingId === invoice.id || isTaskPending(invoice.task_id)" data-tooltip="Resend Invoice"
                     class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition disabled:opacity-50 before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
-                    <Loader2 v-if="resendingId === invoice.id" :size="15" class="animate-spin text-primary" />
+                    <Loader2 v-if="resendingId === invoice.id || isTaskPending(invoice.task_id)" :size="15" class="animate-spin text-primary" />
                     <RotateCw v-else :size="15" />
                   </button>
+
+                  <!-- Edit -->
                   <router-link :to="'/edit/' + invoice.id" data-tooltip="Edit"
                     class="group relative inline-flex items-center justify-center p-2 text-primary hover:bg-blue-50 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
                     <Pencil :size="15" />
                   </router-link>
-                  <button @click="downloadPdf(invoice.id, invoice.invoice_number)" data-tooltip="PDF"
+
+                  <!-- Download Invoice PDF -->
+                  <button @click="downloadPdf(invoice.id, invoice.invoice_number)" data-tooltip="Invoice PDF"
                     class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
                     <FileDown :size="15" />
                   </button>
+
+                  <!-- Email Receipt Asynchronously -->
+                  <button @click="confirmCreateReceipt(invoice)"
+                    :disabled="isTaskPending(invoice.task_id)" data-tooltip="Email Receipt"
+                    class="group relative inline-flex items-center justify-center p-2 border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/70 text-emerald-700 rounded-lg text-xs font-semibold transition disabled:opacity-50 before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <Loader2 v-if="isTaskPending(invoice.task_id)" :size="15" class="animate-spin text-emerald-600" />
+                    <FileCheck2 v-else :size="15" />
+                  </button>
+
+                  <!-- Download Receipt PDF Directly -->
+                  <button @click="downloadReceipt(invoice.id, invoice.invoice_number)" data-tooltip="Receipt PDF"
+                    class="group relative inline-flex items-center justify-center p-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition before:pointer-events-none before:absolute before:bottom-full before:left-1/2 before:-translate-x-1/2 before:mb-2 before:whitespace-nowrap before:rounded-md before:bg-slate-900 before:px-2.5 before:py-1 before:text-xs before:font-medium before:text-white before:shadow-md before:opacity-0 before:transition-opacity before:duration-200 before:content-[attr(data-tooltip)] before:z-30 group-hover:before:opacity-100 hover:before:opacity-100">
+                    <FileText :size="15" />
+                  </button>
+
+                  <!-- Delete -->
                   <button
                     @click="confirmDeleteInvoice(invoice)"
                     data-tooltip="Delete"
@@ -449,7 +664,7 @@ const filteredInvoices = computed(() => {
       </div>
     </div>
 
-    <!-- Send Confirmation Modal -->
+    <!-- Send Invoice Confirmation Modal -->
     <div v-if="showSendModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
       @click.self="!sending && (showSendModal = false)">
@@ -465,7 +680,7 @@ const filteredInvoices = computed(() => {
               Are you sure you want to mark invoice <strong class="text-slate-800 font-semibold font-numbers">{{ invoiceToSend?.invoice_number }}</strong> as sent?
             </p>
             <p class="text-xs text-text-secondary pt-1">
-              This will generate the official PDF and email it to <strong class="text-slate-800">{{ invoiceToSend?.recipient_email }}</strong>.
+              This will generate the official PDF and email it to <strong class="text-slate-800">{{ invoiceToSend?.recipient_email }}</strong> in the background.
             </p>
           </div>
         </div>
@@ -478,7 +693,42 @@ const filteredInvoices = computed(() => {
           <button type="button" @click="executeMarkAsSent" :disabled="sending"
             class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-primary hover:bg-primary-dark active:bg-primary-light text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
             <Loader2 v-if="sending" :size="16" class="animate-spin shrink-0" />
-            <span>{{ sending ? 'Sending...' : 'Send Invoice' }}</span>
+            <span>{{ sending ? 'Queuing...' : 'Send Invoice' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Send Payment Receipt Confirmation Modal -->
+    <div v-if="showReceiptModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+      @click.self="!sendingReceipt && (showReceiptModal = false)">
+      <div
+        class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden flex flex-col p-6 space-y-5">
+        <div class="flex items-start gap-4">
+          <div class="w-11 h-11 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+            <FileCheck2 :size="20" />
+          </div>
+          <div class="space-y-1 flex-1">
+            <h3 class="text-lg font-bold text-text-primary">Send Payment Receipt</h3>
+            <p class="text-sm text-text-secondary">
+              Generate and email an official payment receipt for invoice <strong class="text-slate-800 font-semibold font-numbers">{{ invoiceForReceipt?.invoice_number }}</strong>?
+            </p>
+            <p class="text-xs text-text-secondary pt-1">
+              The branded receipt PDF will be generated in the background and emailed to <strong class="text-slate-800">{{ invoiceForReceipt?.recipient_email }}</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2 border-t border-slate-100">
+          <button type="button" @click="showReceiptModal = false" :disabled="sendingReceipt"
+            class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold transition disabled:opacity-50">
+            Cancel
+          </button>
+          <button type="button" @click="executeCreateReceipt" :disabled="sendingReceipt"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-sm font-semibold shadow-sm hover:shadow transition disabled:opacity-60 disabled:cursor-not-allowed">
+            <Loader2 v-if="sendingReceipt" :size="16" class="animate-spin shrink-0" />
+            <span>{{ sendingReceipt ? 'Queuing...' : 'Send Receipt' }}</span>
           </button>
         </div>
       </div>
