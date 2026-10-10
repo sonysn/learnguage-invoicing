@@ -1,17 +1,20 @@
 {
   "default_branch": "main",
   "branches": [
+    "fix-loader/mandy",
     "main",
     "mandy",
     "origin"
   ],
   "parent": {
+    "fix-loader/mandy": "main",
     "main": null,
     "mandy": "main",
     "origin": "main"
   },
   "order": [
     "main",
+    "fix-loader/mandy",
     "mandy",
     "origin"
   ]
